@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/widgets/gradient_background.dart';
 import '../../core/widgets/ghost_widget.dart';
+import '../../core/widgets/gesture_detector_wrapper.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../models/user_model.dart';
 import '../quests/quests_screen.dart';
+import '../chat/chat_screen.dart';
 
-class GhostSpaceScreen extends StatefulWidget {
+class GhostSpaceScreen extends ConsumerStatefulWidget {
   const GhostSpaceScreen({super.key});
 
   @override
-  State<GhostSpaceScreen> createState() => _GhostSpaceScreenState();
+  ConsumerState<GhostSpaceScreen> createState() => _GhostSpaceScreenState();
 }
 
-class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
+class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
   User? _user;
   bool _isLoading = true;
 
@@ -55,84 +59,142 @@ class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
       backgroundColor: Colors.black,
       body: GradientBackground(
         child: SafeArea(
-          child: Column(
-            children: [
-              // Top bar
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Level badge
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        gradient: AppColors.ghostAuraGradient,
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.auto_awesome, size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Lv $level',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+          child: GhostGestureZone(
+            onGhostTap: () {
+              _showGhostDialog(context);
+              GhostHaptics.medium();
+            },
+            onGhostHold: () {
+              _showQuickActions(context);
+              GhostHaptics.heavy();
+            },
+            onNavigateChat: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ChatScreen()),
+              );
+              GhostHaptics.light();
+            },
+            onShowActions: () {
+              _showQuickActions(context);
+              GhostHaptics.light();
+            },
+            child: Column(
+              children: [
+                // Top bar
+                Padding(
+                  padding: Responsive.padding(context),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Level badge
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.responsiveValue(
+                            mobile: 16,
+                            tablet: 20,
                           ),
-                        ],
+                          vertical: context.responsiveValue(
+                            mobile: 8,
+                            tablet: 12,
+                          ),
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: AppColors.ghostAuraGradient,
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.auto_awesome,
+                              size: context.responsiveValue(
+                                mobile: 16,
+                                tablet: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Lv $level',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.responsiveValue(
+                                  mobile: 14,
+                                  tablet: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
 
-                    // Coins
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppRadius.full),
-                      ),
-                      child: Row(
-                        children: [
-                          const Text('💎', style: TextStyle(fontSize: 16)),
-                          const SizedBox(width: 4),
-                          Text(
-                            coins.toString(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                      // Coins
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: context.responsiveValue(
+                            mobile: 16,
+                            tablet: 20,
                           ),
-                        ],
+                          vertical: context.responsiveValue(
+                            mobile: 8,
+                            tablet: 12,
+                          ),
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(AppRadius.full),
+                        ),
+                        child: Row(
+                          children: [
+                            Text(
+                              '💎',
+                              style: TextStyle(
+                                fontSize: context.responsiveValue(
+                                  mobile: 16,
+                                  tablet: 20,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              coins.toString(),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: context.responsiveValue(
+                                  mobile: 14,
+                                  tablet: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              const Spacer(),
+                const Spacer(),
 
-              // Ghost (center)
-              GestureDetector(
-                onTap: () {
-                  // Show quick actions
-                  _showQuickActions(context);
-                },
-                child: Column(
+                // Ghost (center) with gesture hint
+                Column(
                   children: [
-                    const GhostWidget(
-                      size: 160,
+                    GhostWidget(
+                      size: Responsive.ghostSize(context),
                       showAura: true,
-                      isAnimated: true, // was `animate: true`
+                      isAnimated: true,
+                      mood: ghostProfile?.currentMood ?? 'happy',
+                      onTap: () {
+                        _showGhostDialog(context);
+                      },
+                      onLongPress: () {
+                        _showQuickActions(context);
+                      },
                     ),
 
-                    const SizedBox(height: 24),
+                    SizedBox(
+                      height: context.responsiveValue(
+                        mobile: 24,
+                        tablet: 32,
+                      ),
+                    ),
 
                     // XP Progress
                     Column(
@@ -143,7 +205,10 @@ class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
                         ),
                         const SizedBox(height: 8),
                         Container(
-                          width: 200,
+                          width: context.responsiveValue(
+                            mobile: 200,
+                            tablet: 300,
+                          ),
                           height: 8,
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.1),
@@ -165,68 +230,138 @@ class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
 
                     const SizedBox(height: 16),
 
-                    // Hint
-                    Text(
-                      'Tap me to talk',
-                      style: TextStyle(
-                        color: AppTheme.ghostWhite.withOpacity(0.6),
-                        fontSize: 14,
-                      ),
+                    // Gesture hints
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _GestureHint(
+                          icon: Icons.touch_app,
+                          label: 'Tap',
+                        ),
+                        const SizedBox(width: 16),
+                        _GestureHint(
+                          icon: Icons.pan_tool,
+                          label: 'Hold',
+                        ),
+                        const SizedBox(width: 16),
+                        _GestureHint(
+                          icon: Icons.swipe,
+                          label: 'Swipe',
+                        ),
+                      ],
                     )
                         .animate(onPlay: (controller) => controller.repeat())
                         .fadeIn(duration: 2.seconds)
                         .fadeOut(duration: 2.seconds),
                   ],
                 ),
-              ),
 
-              const Spacer(),
+                const Spacer(),
 
-              // Quick stats
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.local_fire_department,
-                        label: 'Streak',
-                        value: '0',
-                        color: AppColors.error,
-                      ),
+                // Quick stats
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: context.responsiveValue(
+                      mobile: 24,
+                      tablet: 48,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatCard(
-                        icon: Icons.trending_up,
-                        label: 'Daily XP',
-                        value: '0',
-                        color: AppColors.success,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const QuestsScreen(),
-                            ),
-                          );
-                        },
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
                         child: _StatCard(
-                          icon: Icons.stars,
-                          label: 'Quests',
+                          icon: Icons.local_fire_department,
+                          label: 'Streak',
                           value: '0',
-                          color: AppColors.auraStart,
+                          color: AppColors.error,
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _StatCard(
+                          icon: Icons.trending_up,
+                          label: 'Daily XP',
+                          value: '0',
+                          color: AppColors.success,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const QuestsScreen(),
+                              ),
+                            );
+                          },
+                          child: _StatCard(
+                            icon: Icons.stars,
+                            label: 'Quests',
+                            value: '0',
+                            color: AppColors.auraStart,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(
+                  height: context.responsiveValue(
+                    mobile: 32,
+                    tablet: 48,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showGhostDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: AppColors.ghostAuraGradient,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '👻',
+                style: TextStyle(fontSize: 64),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Hey! What\'s up?',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ChatScreen()),
+                  );
+                },
+                child: const Text(
+                  'Let\'s chat',
+                  style: TextStyle(color: Colors.white),
                 ),
               ),
-
-              const SizedBox(height: 32),
             ],
           ),
         ),
@@ -239,9 +374,9 @@ class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF1A1A1A),
-          borderRadius: const BorderRadius.vertical(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(
             top: Radius.circular(AppRadius.lg),
           ),
         ),
@@ -309,6 +444,37 @@ class _GhostSpaceScreenState extends State<GhostSpaceScreen> {
   }
 }
 
+class _GestureHint extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _GestureHint({
+    required this.icon,
+    required this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: AppTheme.ghostWhite.withOpacity(0.4),
+          size: 20,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: AppTheme.ghostWhite.withOpacity(0.4),
+            fontSize: 10,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _StatCard extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -325,7 +491,12 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(
+        context.responsiveValue(
+          mobile: 16,
+          tablet: 20,
+        ),
+      ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(AppRadius.md),

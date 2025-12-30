@@ -1,41 +1,107 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
+import '../services/wallpaper_sync_service.dart';
+import '../../main.dart';
+import '../utils/responsive.dart';
 
-class GhostWidget extends StatelessWidget {
+class GhostWidget extends ConsumerStatefulWidget {
   final double size;
   final bool showAura;
-  final bool isAnimated; // renamed from `animate`
+  final bool isAnimated;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final String? mood;
 
   const GhostWidget({
     super.key,
     this.size = 120,
     this.showAura = true,
-    this.isAnimated = true, // renamed param
+    this.isAnimated = true,
     this.onTap,
+    this.onLongPress,
     this.mood,
   });
 
   @override
+  ConsumerState<GhostWidget> createState() => _GhostWidgetState();
+}
+
+class _GhostWidgetState extends ConsumerState<GhostWidget> 
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  bool _isPressed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 200),
+      vsync: this,
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final wallpaperService = ref.watch(wallpaperServiceProvider);
+    final colors = wallpaperService.currentColors;
+    
+    // Responsive size
+    final responsiveSize = Responsive.responsive(
+      context,
+      mobile: widget.size,
+      tablet: widget.size * 1.4,
+      desktop: widget.size * 1.8,
+    );
+
     return GestureDetector(
-      onTap: onTap,
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+        _pulseController.forward();
+      },
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        _pulseController.reverse();
+        widget.onTap?.call();
+      },
+      onTapCancel: () {
+        setState(() => _isPressed = false);
+        _pulseController.reverse();
+      },
+      onLongPress: widget.onLongPress,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Aura ring
-          if (showAura)
-            Container(
-              width: size * 1.5,
-              height: size * 1.5,
+          // Aura ring (wallpaper-adaptive)
+          if (widget.showAura)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: _isPressed 
+                  ? responsiveSize * 1.4 
+                  : responsiveSize * 1.5,
+              height: _isPressed 
+                  ? responsiveSize * 1.4 
+                  : responsiveSize * 1.5,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: AppColors.ghostAuraGradient,
+                gradient: RadialGradient(
+                  colors: [
+                    (colors?.auraStart ?? AppColors.auraStart).withOpacity(0.6),
+                    (colors?.auraEnd ?? AppColors.auraEnd).withOpacity(0.3),
+                    Colors.transparent,
+                  ],
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.auraStart.withOpacity(0.5),
+                    color: (colors?.auraStart ?? AppColors.auraStart)
+                        .withOpacity(0.5),
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),
@@ -43,38 +109,57 @@ class GhostWidget extends StatelessWidget {
               ),
             )
                 .animate(
-                  onPlay: (controller) => isAnimated ? controller.repeat() : null,
+                  onPlay: (controller) => 
+                      widget.isAnimated ? controller.repeat(reverse: true) : null,
                 )
-                .shimmer(duration: 2.seconds, color: Colors.white24)
                 .scale(
                   begin: const Offset(0.95, 0.95),
                   end: const Offset(1.05, 1.05),
                   duration: 2.seconds,
                   curve: Curves.easeInOut,
+                )
+                .then()
+                .shimmer(
+                  duration: 2.seconds,
+                  color: Colors.white24,
                 ),
 
           // Ghost body
-          Container(
-            width: size,
-            height: size,
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: _isPressed 
+                ? responsiveSize * 0.9 
+                : responsiveSize,
+            height: _isPressed 
+                ? responsiveSize * 0.9 
+                : responsiveSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  AppColors.ghostTint,
-                  AppColors.ghostTint.withOpacity(0.8),
+                  colors?.ghostTint ?? AppColors.ghostTint,
+                  (colors?.ghostTint ?? AppColors.ghostTint).withOpacity(0.8),
                 ],
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: (colors?.auraStart ?? AppColors.auraStart)
+                      .withOpacity(0.3),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
             ),
             child: Center(
               child: Text(
                 _getGhostEmoji(),
-                style: TextStyle(fontSize: size * 0.5),
+                style: TextStyle(fontSize: responsiveSize * 0.5),
               ),
             ),
           )
               .animate(
-                onPlay: (controller) => isAnimated ? controller.repeat() : null,
+                onPlay: (controller) => 
+                    widget.isAnimated ? controller.repeat(reverse: true) : null,
               )
               .moveY(
                 begin: -5,
@@ -82,13 +167,51 @@ class GhostWidget extends StatelessWidget {
                 duration: 3.seconds,
                 curve: Curves.easeInOut,
               ),
+
+          // Particle effects
+          if (widget.showAura)
+            ...List.generate(6, (index) {
+              return Positioned(
+                left: responsiveSize * 0.3 + (index * 15),
+                top: responsiveSize * 0.2 + (index % 3 * 20),
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: (colors?.particleColor ?? AppColors.particleColor)
+                        .withOpacity(0.6),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (colors?.particleColor ?? AppColors.particleColor)
+                            .withOpacity(0.8),
+                        blurRadius: 4,
+                      ),
+                    ],
+                  ),
+                )
+                    .animate(
+                      onPlay: (controller) => 
+                          widget.isAnimated ? controller.repeat() : null,
+                    )
+                    .moveY(
+                      begin: 0,
+                      end: -30,
+                      duration: Duration(seconds: 2 + index),
+                      curve: Curves.easeOut,
+                    )
+                    .fadeOut(
+                      duration: Duration(seconds: 2 + index),
+                    ),
+              );
+            }),
         ],
       ),
     );
   }
 
   String _getGhostEmoji() {
-    switch (mood) {
+    switch (widget.mood) {
       case 'happy':
         return '👻';
       case 'excited':
@@ -97,6 +220,10 @@ class GhostWidget extends StatelessWidget {
         return '😴';
       case 'thinking':
         return '🤔';
+      case 'focused':
+        return '🎯';
+      case 'celebration':
+        return '🎉';
       default:
         return '👻';
     }

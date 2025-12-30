@@ -1,3 +1,4 @@
+// android/app/src/main/kotlin/com/ghostx/app/MainActivity.kt
 package com.ghostx.app
 
 import android.app.WallpaperManager
@@ -18,27 +19,44 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "getWallpaper" -> {
                     try {
-                        val wallpaperManager = WallpaperManager.getInstance(applicationContext)
-                        val drawable = wallpaperManager.drawable
-                        
-                        if (drawable is BitmapDrawable) {
-                            val bitmap = drawable.bitmap
-                            val stream = ByteArrayOutputStream()
-                            
-                            // Compress to reduce size
-                            bitmap.compress(Bitmap.CompressFormat.PNG, 80, stream)
-                            val byteArray = stream.toByteArray()
-                            
-                            result.success(byteArray)
+                        val wallpaperBytes = getWallpaperBytes()
+                        if (wallpaperBytes != null) {
+                            result.success(wallpaperBytes)
                         } else {
-                            result.error("NO_WALLPAPER", "Could not get wallpaper", null)
+                            result.error("UNAVAILABLE", "Wallpaper not available", null)
                         }
                     } catch (e: Exception) {
-                        result.error("ERROR", e.message, null)
+                        result.error("ERROR", "Failed to get wallpaper: ${e.message}", null)
                     }
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun getWallpaperBytes(): ByteArray? {
+        return try {
+            val wallpaperManager = WallpaperManager.getInstance(applicationContext)
+            val drawable = wallpaperManager.drawable ?: return null
+            
+            val bitmap = (drawable as? BitmapDrawable)?.bitmap 
+                ?: Bitmap.createBitmap(
+                    drawable.intrinsicWidth,
+                    drawable.intrinsicHeight,
+                    Bitmap.Config.ARGB_8888
+                ).apply {
+                    val canvas = android.graphics.Canvas(this)
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    drawable.draw(canvas)
+                }
+            
+            // Compress to reduce size
+            val stream = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+            stream.toByteArray()
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 }
