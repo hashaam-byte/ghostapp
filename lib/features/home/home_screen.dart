@@ -44,8 +44,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    // Responsive sizing
-    final navHeight = Responsive.navHeight(context);
+    // Get safe area bottom padding
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    
+    // Calculate base nav height based on device type
+    final baseNavHeight = Responsive.responsive(
+      context,
+      mobile: 60.0,
+      tablet: 70.0,
+      desktop: 80.0,
+    );
+    
+    // Total height = base height + safe area padding
+    final totalNavHeight = baseNavHeight + bottomPadding;
+    
     final iconSize = Responsive.iconSize(context);
     final fontSize = Responsive.fontSize(
       context,
@@ -67,8 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: SafeArea(
+        top: false, // Only apply safe area to bottom
         child: Container(
-          height: navHeight,
+          height: baseNavHeight, // Use base height here
           padding: EdgeInsets.symmetric(
             horizontal: Responsive.responsive(
               context,
@@ -76,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
               tablet: 48.0,
               desktop: 64.0,
             ),
-            vertical: 8,
+            vertical: 8, // Reduced vertical padding
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -89,7 +102,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 fontSize: fontSize,
                 onTap: () {
                   setState(() => _currentIndex = index);
-                  // Add haptic feedback
                   HapticFeedback.selectionClick();
                 },
               ),
@@ -130,8 +142,8 @@ class _NavItemWidget extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: context.isTablet ? 20 : 16,
-          vertical: context.isTablet ? 12 : 8,
+          horizontal: context.isTablet ? 20 : 12, // Reduced padding
+          vertical: context.isTablet ? 8 : 6, // Reduced padding
         ),
         decoration: isActive
             ? BoxDecoration(
@@ -149,7 +161,7 @@ class _NavItemWidget extends StatelessWidget {
                   : AppTheme.ghostWhite.withOpacity(0.5),
               size: iconSize,
             ),
-            SizedBox(height: context.isTablet ? 6 : 4),
+            SizedBox(height: context.isTablet ? 4 : 2), // Reduced spacing
             Text(
               item.label,
               style: TextStyle(
@@ -166,4 +178,3 @@ class _NavItemWidget extends StatelessWidget {
     );
   }
 }
-

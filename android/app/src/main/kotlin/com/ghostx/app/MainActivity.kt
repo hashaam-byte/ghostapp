@@ -19,9 +19,31 @@ class MainActivity: FlutterActivity() {
             when (call.method) {
                 "getWallpaper" -> {
                     try {
-                        val wallpaperBytes = getWallpaperBytes()
-                        if (wallpaperBytes != null) {
-                            result.success(wallpaperBytes)
+                        val wallpaperManager = WallpaperManager.getInstance(applicationContext)
+                        val wallpaperDrawable = wallpaperManager.drawable
+                        
+                        if (wallpaperDrawable is BitmapDrawable) {
+                            val bitmap = wallpaperDrawable.bitmap
+                            
+                            // Resize for performance (max 1000px width)
+                            val scaledBitmap = if (bitmap.width > 1000) {
+                                val scale = 1000f / bitmap.width
+                                Bitmap.createScaledBitmap(
+                                    bitmap,
+                                    1000,
+                                    (bitmap.height * scale).toInt(),
+                                    true
+                                )
+                            } else {
+                                bitmap
+                            }
+                            
+                            // Convert to byte array
+                            val stream = ByteArrayOutputStream()
+                            scaledBitmap.compress(Bitmap.CompressFormat.PNG, 90, stream)
+                            val byteArray = stream.toByteArray()
+                            
+                            result.success(byteArray)
                         } else {
                             result.error("UNAVAILABLE", "Wallpaper not available", null)
                         }
@@ -31,32 +53,6 @@ class MainActivity: FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
-        }
-    }
-
-    private fun getWallpaperBytes(): ByteArray? {
-        return try {
-            val wallpaperManager = WallpaperManager.getInstance(applicationContext)
-            val drawable = wallpaperManager.drawable ?: return null
-            
-            val bitmap = (drawable as? BitmapDrawable)?.bitmap 
-                ?: Bitmap.createBitmap(
-                    drawable.intrinsicWidth,
-                    drawable.intrinsicHeight,
-                    Bitmap.Config.ARGB_8888
-                ).apply {
-                    val canvas = android.graphics.Canvas(this)
-                    drawable.setBounds(0, 0, canvas.width, canvas.height)
-                    drawable.draw(canvas)
-                }
-            
-            // Compress to reduce size
-            val stream = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-            stream.toByteArray()
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
         }
     }
 }

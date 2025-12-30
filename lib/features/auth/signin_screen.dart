@@ -31,24 +31,39 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
+    // Validate form
     if (!_formKey.currentState!.validate()) return;
 
+    // Show loading
     setState(() => _isLoading = true);
 
     try {
+      debugPrint('🔐 Attempting sign in...');
+      
       final response = await ApiClient.post(
         ApiConfig.signin,
         data: {
           'email': _emailController.text.trim(),
           'password': _passwordController.text,
         },
+      ).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Request timeout. Check your internet connection.');
+        },
       );
+
+      debugPrint('📡 Response status: ${response.statusCode}');
 
       if (response.statusCode == 200) {
         final data = response.data;
         final token = data['token'];
         final user = data['user'];
         final needsOnboarding = data['needsOnboarding'] ?? false;
+
+        debugPrint('✅ Sign in successful');
+        debugPrint('👤 User: ${user['email']}');
+        debugPrint('🎯 Needs onboarding: $needsOnboarding');
 
         // Save token and user data
         await StorageService.saveToken(token);
@@ -57,7 +72,20 @@ class _SignInScreenState extends State<SignInScreen> {
 
         if (!mounted) return;
 
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Welcome back! 👻'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
         // Navigate based on onboarding status
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        if (!mounted) return;
+
         if (needsOnboarding) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
@@ -73,13 +101,34 @@ class _SignInScreenState extends State<SignInScreen> {
             (route) => false,
           );
         }
+      } else {
+        throw Exception(response.data['message'] ?? 'Sign in failed');
       }
     } catch (e) {
+      debugPrint('❌ Sign in error: $e');
+      
       if (mounted) {
+        // Parse error message
+        String errorMessage = 'Sign in failed. Please try again.';
+        
+        if (e.toString().contains('Invalid email or password')) {
+          errorMessage = 'Invalid email or password';
+        } else if (e.toString().contains('timeout')) {
+          errorMessage = 'Connection timeout. Check your internet.';
+        } else if (e.toString().contains('Network')) {
+          errorMessage = 'Network error. Check your connection.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(errorMessage),
             backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _signIn,
+            ),
           ),
         );
       }
@@ -129,6 +178,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     prefixIcon: const Icon(Icons.person_outline),
+                    enabled: !_isLoading,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Email or username is required';
@@ -145,6 +195,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     controller: _passwordController,
                     obscureText: _obscurePassword,
                     prefixIcon: const Icon(Icons.lock_outline),
+                    enabled: !_isLoading,
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -167,8 +218,13 @@ class _SignInScreenState extends State<SignInScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: () {
+                      onPressed: _isLoading ? null : () {
                         // TODO: Implement forgot password
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Password reset coming soon!'),
+                          ),
+                        );
                       },
                       child: Text(
                         'Forgot Password?',
@@ -185,7 +241,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   // Sign In Button
                   CustomButton(
                     text: 'Sign In',
-                    onPressed: _signIn,
+                    onPressed: _isLoading ? null : _signIn,
                     isLoading: _isLoading,
                     width: double.infinity,
                   ),
@@ -201,7 +257,7 @@ class _SignInScreenState extends State<SignInScreen> {
                         style: Theme.of(context).textTheme.bodyMedium,
                       ),
                       TextButton(
-                        onPressed: () => Navigator.pop(context),
+                        onPressed: _isLoading ? null : () => Navigator.pop(context),
                         child: Text(
                           'Sign Up',
                           style: TextStyle(
@@ -212,6 +268,20 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 24),
+
+                  // Debug info (remove in production)
+                  if (const bool.fromEnvironment('dart.vm.product') == false)
+                    Center(
+                      child: Text(
+                        'API: ${ApiConfig.baseUrl}',
+                        style: TextStyle(
+                          color: AppTheme.ghostWhite.withOpacity(0.3),
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
