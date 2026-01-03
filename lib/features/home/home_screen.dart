@@ -44,26 +44,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    // Get safe area bottom padding
     final bottomPadding = MediaQuery.of(context).padding.bottom;
-    
-    // Calculate base nav height based on device type
     final baseNavHeight = Responsive.responsive(
       context,
-      mobile: 60.0,
-      tablet: 70.0,
-      desktop: 80.0,
+      mobile: 56.0,  // Reduced from 60
+      tablet: 64.0,   // Reduced from 70
+      desktop: 72.0,  // Reduced from 80
     );
     
-    // Total height = base height + safe area padding
-    final totalNavHeight = baseNavHeight + bottomPadding;
-    
-    final iconSize = Responsive.iconSize(context);
-    final fontSize = Responsive.fontSize(
+    final iconSize = Responsive.responsive(
       context,
-      mobile: 11,
-      tablet: 13,
-      desktop: 15,
+      mobile: 22.0,   // Reduced from 24
+      tablet: 26.0,   // Reduced from 32
+      desktop: 32.0,  // Reduced from 40
+    );
+    
+    final fontSize = Responsive.responsive(
+      context,
+      mobile: 10.0,   // Reduced from 11
+      tablet: 11.0,   // Reduced from 13
+      desktop: 13.0,  // Reduced from 15
     );
 
     return Container(
@@ -79,31 +79,33 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       child: SafeArea(
-        top: false, // Only apply safe area to bottom
-        child: Container(
-          height: baseNavHeight, // Use base height here
-          padding: EdgeInsets.symmetric(
-            horizontal: Responsive.responsive(
-              context,
-              mobile: 24.0,
-              tablet: 48.0,
-              desktop: 64.0,
+        top: false,
+        child: SizedBox(
+          height: baseNavHeight,
+          child: Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: Responsive.responsive(
+                context,
+                mobile: 16.0,   // Reduced from 24
+                tablet: 32.0,   // Reduced from 48
+                desktop: 48.0,  // Reduced from 64
+              ),
+              vertical: 4.0,    // Reduced from 8
             ),
-            vertical: 8, // Reduced vertical padding
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(
-              _navItems.length,
-              (index) => _NavItemWidget(
-                item: _navItems[index],
-                isActive: _currentIndex == index,
-                iconSize: iconSize,
-                fontSize: fontSize,
-                onTap: () {
-                  setState(() => _currentIndex = index);
-                  HapticFeedback.selectionClick();
-                },
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(
+                _navItems.length,
+                (index) => _NavItemWidget(
+                  item: _navItems[index],
+                  isActive: _currentIndex == index,
+                  iconSize: iconSize,
+                  fontSize: fontSize,
+                  onTap: () {
+                    setState(() => _currentIndex = index);
+                    HapticFeedback.selectionClick();
+                  },
+                ),
               ),
             ),
           ),
@@ -137,13 +139,15 @@ class _NavItemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isTablet = context.isTablet;
+    
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: context.isTablet ? 20 : 12, // Reduced padding
-          vertical: context.isTablet ? 8 : 6, // Reduced padding
+          horizontal: isTablet ? 16 : 10,  // Reduced
+          vertical: isTablet ? 6 : 4,      // Reduced
         ),
         decoration: isActive
             ? BoxDecoration(
@@ -153,6 +157,7 @@ class _NavItemWidget extends StatelessWidget {
             : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               item.icon,
@@ -161,7 +166,7 @@ class _NavItemWidget extends StatelessWidget {
                   : AppTheme.ghostWhite.withOpacity(0.5),
               size: iconSize,
             ),
-            SizedBox(height: context.isTablet ? 4 : 2), // Reduced spacing
+            SizedBox(height: isTablet ? 3 : 2),  // Reduced
             Text(
               item.label,
               style: TextStyle(
@@ -171,6 +176,8 @@ class _NavItemWidget extends StatelessWidget {
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
