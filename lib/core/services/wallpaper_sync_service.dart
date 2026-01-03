@@ -1,297 +1,339 @@
-// lib/core/services/wallpaper_sync_service.dart
-import 'dart:ui' as ui;
+// lib/core/services/wallpaper_sync_service.dart - FIXED FOR YOUR STORAGE
+import 'dart:typed_data';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:palette_generator/palette_generator.dart';
 import 'package:image/image.dart' as img;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import 'storage_service.dart';
 
+class WallpaperColors {
+  final Color primary;
+  final Color accent;
+  final Color auraStart;
+  final Color auraEnd;
+  final Color ghostTint;
+  final Color particleColor;
+
+  WallpaperColors({
+    required this.primary,
+    required this.accent,
+    required this.auraStart,
+    required this.auraEnd,
+    Color? ghostTint,
+    Color? particleColor,
+  }) : ghostTint = ghostTint ?? primary.withOpacity(0.3),
+       particleColor = particleColor ?? accent.withOpacity(0.5);
+
+  Map<String, dynamic> toJson() => {
+    'primary': primary.value,
+    'accent': accent.value,
+    'auraStart': auraStart.value,
+    'auraEnd': auraEnd.value,
+    'ghostTint': ghostTint.value,
+    'particleColor': particleColor.value,
+  };
+
+  factory WallpaperColors.fromJson(Map<String, dynamic> json) {
+    return WallpaperColors(
+      primary: Color(json['primary']),
+      accent: Color(json['accent']),
+      auraStart: Color(json['auraStart']),
+      auraEnd: Color(json['auraEnd']),
+      ghostTint: json['ghostTint'] != null ? Color(json['ghostTint']) : null,
+      particleColor: json['particleColor'] != null ? Color(json['particleColor']) : null,
+    );
+  }
+
+  factory WallpaperColors.defaultColors() {
+    return WallpaperColors(
+      primary: AppTheme.primaryPurple,
+      accent: AppTheme.accentCyan,
+      auraStart: AppColors.auraStart,
+      auraEnd: AppColors.auraEnd,
+    );
+  }
+}
+
 class WallpaperSyncService extends ChangeNotifier {
-  static final WallpaperSyncService _instance = WallpaperSyncService._internal();
-  factory WallpaperSyncService() => _instance;
-  WallpaperSyncService._internal();
-
-  static const MethodChannel _channel = MethodChannel('ghostx/wallpaper');
-
-  WallpaperColors? _currentColors;
+  static const platform = MethodChannel('ghostx/wallpaper');
+  static const String _wallpaperBytesKey = 'wallpaper_bytes_base64';
+  
   Uint8List? _wallpaperBytes;
+  WallpaperColors? _currentColors;
   bool _isEnabled = true;
+  bool _hasPermission = false;
   bool _isLoading = false;
-  bool _permissionGranted = false;
 
-  WallpaperColors? get currentColors => _currentColors;
   Uint8List? get wallpaperBytes => _wallpaperBytes;
+  WallpaperColors? get currentColors => _currentColors;
   bool get isEnabled => _isEnabled;
+  bool get hasPermission => _hasPermission;
   bool get isLoading => _isLoading;
-  bool get hasPermission => _permissionGranted;
 
-  // Initialize on app start
   Future<void> initialize() async {
     debugPrint('🎨 Initializing wallpaper colors...');
     
-    // Load saved settings first
-    await _loadSavedSettings();
+    // Step 1: Load saved data immediately (instant UI)
+    await _loadSavedData();
     
-    // Check and request permission
-    final hasPermission = await _checkAndRequestPermission();
+    // Step 2: Check and request permission (this shows dialog on Android 6-12)
+    debugPrint('📋 Requesting wallpaper permission...');
+    _hasPermission = await _requestPermission();
     
-    if (hasPermission && _isEnabled) {
-      debugPrint('✅ Wallpaper permission granted');
-      await extractAndApply();
+    if (_hasPermission) {
+      debugPrint('✅ Wallpaper permission granted - extracting colors');
+      await _extractWallpaperColors();
     } else {
+      debugPrint('! Wallpaper permission denied by user');
       debugPrint('ℹ️ Using default colors (no wallpaper permission)');
-      await _applyColors(WallpaperColors.defaultColors());
+      _useDefaultColors();
+    }
+    
+    notifyListeners();
+  }
+
+  Future<bool> _requestPermission() async {
+    try {
+      // First check using the native channel
+      final bool? hasNativePermission = await platform.invokeMethod('checkWallpaperPermission');
+      
+      if (hasNativePermission == true) {
+        debugPrint('✅ Permission already granted (Android 13+ or previously granted)');
+        return true;
+      }
+
+      // For Android 6-12, request permission using native dialog
+      debugPrint('📱 Requesting permission (Android 6-12)...');
+      final bool? permissionGranted = await platform.invokeMethod('requestWallpaperPermission');
+      
+      if (permissionGranted == true) {
+        debugPrint('✅ User granted wallpaper permission');
+        return true;
+      } else {
+        debugPrint('! User denied wallpaper permission');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('⚠️ Permission request error: $e');
+      // Try fallback with permission_handler package
+      return await _requestPermissionFallback();
     }
   }
 
-  // Check and request wallpaper permission
-  Future<bool> _checkAndRequestPermission() async {
+  Future<bool> _requestPermissionFallback() async {
     try {
-      // First check if we're on Android 13+ (no permission needed)
-      final nativeCheck = await _channel.invokeMethod<bool>('checkWallpaperPermission');
-      
-      if (nativeCheck == true) {
-        debugPrint('✅ Wallpaper permission granted (Android 13+ or already granted)');
-        _permissionGranted = true;
+      // Android 13+ needs photos permission
+      if (await Permission.photos.request().isGranted) {
         return true;
       }
       
-      // For Android 6-12, we need to request READ_EXTERNAL_STORAGE
-      debugPrint('📋 Requesting storage permission for wallpaper (Android 6-12)...');
-      
-      // Use permission_handler to request
-      final status = await Permission.storage.request();
-      
-      if (status.isGranted) {
-        debugPrint('✅ Storage permission granted via permission_handler');
-        _permissionGranted = true;
-        
-        // Verify with native side
-        final nativeVerify = await _channel.invokeMethod<bool>('checkWallpaperPermission');
-        if (nativeVerify == false) {
-          debugPrint('⚠️ Native verification failed after grant - retrying...');
-          // Give Android a moment to update permission status
-          await Future.delayed(const Duration(milliseconds: 500));
-          final retryCheck = await _channel.invokeMethod<bool>('checkWallpaperPermission');
-          _permissionGranted = retryCheck ?? false;
-          return _permissionGranted;
-        }
-        
+      // Android 6-12 needs storage permission
+      if (await Permission.storage.request().isGranted) {
         return true;
-      } else if (status.isPermanentlyDenied) {
-        debugPrint('❌ Storage permission permanently denied');
-        debugPrint('ℹ️ User needs to enable in Settings > Apps > GhostX > Permissions');
-        _permissionGranted = false;
-        return false;
-      } else {
-        debugPrint('! Wallpaper permission denied by user');
-        _permissionGranted = false;
-        return false;
       }
       
+      return false;
     } catch (e) {
-      debugPrint('⚠️ Permission check error: $e');
-      _permissionGranted = false;
+      debugPrint('⚠️ Fallback permission failed: $e');
       return false;
     }
   }
 
-  // Extract wallpaper and generate adaptive colors
-  Future<void> extractAndApply() async {
-    if (!_isEnabled) return;
+  Future<void> _extractWallpaperColors() async {
+    if (!_hasPermission) {
+      debugPrint('⚠️ Cannot extract wallpaper - no permission');
+      return;
+    }
 
     _isLoading = true;
     notifyListeners();
 
     try {
-      // CRITICAL: Only try to get wallpaper if we have permission
-      if (!_permissionGranted) {
-        debugPrint('⚠️ Cannot extract wallpaper - permission not granted');
-        await _applyColors(WallpaperColors.defaultColors());
+      // Get wallpaper from native side
+      final Uint8List? wallpaper = await platform.invokeMethod('getWallpaper');
+      
+      if (wallpaper == null || wallpaper.isEmpty) {
+        debugPrint('ℹ️ No wallpaper data received');
+        _useDefaultColors();
         return;
       }
+
+      _wallpaperBytes = wallpaper;
       
-      // Try to get wallpaper from Android
-      final bytes = await _getWallpaperBytes();
-      
-      if (bytes != null) {
-        _wallpaperBytes = bytes;
-        final colors = await _generatePaletteFromBytes(bytes);
-        await _applyColors(colors);
-        debugPrint('✅ Wallpaper colors extracted and applied');
+      // Extract colors
+      final image = img.decodeImage(wallpaper);
+      if (image != null) {
+        final colors = _extractColorsFromImage(image);
+        _currentColors = colors;
+        
+        // Save to storage
+        await _saveColors(colors);
+        await _saveWallpaper(wallpaper);
+        
+        debugPrint('✅ Wallpaper colors extracted and saved');
       } else {
-        // Fallback to default
-        debugPrint('ℹ️ Using default colors (no wallpaper data)');
-        await _applyColors(WallpaperColors.defaultColors());
+        debugPrint('⚠️ Failed to decode wallpaper image');
+        _useDefaultColors();
       }
+    } on PlatformException catch (e) {
+      debugPrint('❌ Failed to get wallpaper: ${e.code} - ${e.message}');
+      
+      if (e.code == 'PERMISSION_DENIED') {
+        _hasPermission = false;
+        debugPrint('ℹ️ Using default colors (no wallpaper permission)');
+      }
+      
+      _useDefaultColors();
     } catch (e) {
-      debugPrint('⚠️ Wallpaper extraction failed: $e');
-      await _applyColors(WallpaperColors.defaultColors());
+      debugPrint('❌ Unexpected error: $e');
+      _useDefaultColors();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Get wallpaper bytes from Android native
-  Future<Uint8List?> _getWallpaperBytes() async {
+  void _useDefaultColors() {
+    _currentColors = WallpaperColors.defaultColors();
+    notifyListeners();
+  }
+
+  WallpaperColors _extractColorsFromImage(img.Image image) {
+    // Resize for faster processing
+    final resized = img.copyResize(image, width: 100);
+    
+    // Extract dominant colors
+    final colors = <Color>[];
+    for (int y = 0; y < resized.height; y += 5) {
+      for (int x = 0; x < resized.width; x += 5) {
+        final pixel = resized.getPixel(x, y);
+        colors.add(Color.fromARGB(255, pixel.r.toInt(), pixel.g.toInt(), pixel.b.toInt()));
+      }
+    }
+
+    // Sort by vibrance
+    colors.sort((a, b) => _colorVibrance(b).compareTo(_colorVibrance(a)));
+    
+    final primary = colors.isNotEmpty ? colors[0] : AppTheme.primaryPurple;
+    final accent = colors.length > 1 ? colors[1] : AppTheme.accentCyan;
+    
+    return WallpaperColors(
+      primary: primary,
+      accent: accent,
+      auraStart: primary.withOpacity(0.6),
+      auraEnd: accent.withOpacity(0.4),
+      ghostTint: primary.withOpacity(0.3),
+      particleColor: accent.withOpacity(0.5),
+    );
+  }
+
+  double _colorVibrance(Color color) {
+    final max = [color.red, color.green, color.blue].reduce((a, b) => a > b ? a : b);
+    final min = [color.red, color.green, color.blue].reduce((a, b) => a < b ? a : b);
+    return (max - min) / 255.0;
+  }
+
+  Future<void> _loadSavedData() async {
     try {
-      final Uint8List? bytes = await _channel.invokeMethod('getWallpaper');
-      return bytes;
+      // Load saved colors
+      final savedColors = await StorageService.getWallpaperColors();
+      if (savedColors != null) {
+        _currentColors = WallpaperColors.fromJson(savedColors);
+        debugPrint('✅ Loaded saved wallpaper colors');
+      }
+
+      // Load saved wallpaper bytes (stored as base64 to work with SharedPreferences)
+      try {
+        final base64String = await _getWallpaperBytesFromStorage();
+        if (base64String != null && base64String.isNotEmpty) {
+          _wallpaperBytes = base64Decode(base64String);
+          debugPrint('✅ Loaded saved wallpaper image');
+        }
+      } catch (e) {
+        debugPrint('ℹ️ No saved wallpaper bytes found: $e');
+      }
+
+      if (_currentColors == null) {
+        _useDefaultColors();
+      }
     } catch (e) {
-      debugPrint('❌ Failed to get wallpaper: $e');
+      debugPrint('⚠️ Failed to load saved data: $e');
+      _useDefaultColors();
+    }
+  }
+
+  Future<void> _saveColors(WallpaperColors colors) async {
+    await StorageService.saveWallpaperColors(colors.toJson());
+  }
+
+  Future<void> _saveWallpaper(Uint8List bytes) async {
+    try {
+      // Convert to base64 for SharedPreferences storage
+      final base64String = base64Encode(bytes);
+      await _saveWallpaperBytesToStorage(base64String);
+      debugPrint('✅ Wallpaper bytes saved');
+    } catch (e) {
+      debugPrint('⚠️ Failed to save wallpaper bytes: $e');
+    }
+  }
+
+  // Helper methods for wallpaper bytes storage (using SharedPreferences directly)
+  Future<String?> _getWallpaperBytesFromStorage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getString(_wallpaperBytesKey);
+    } catch (e) {
+      debugPrint('⚠️ Failed to get wallpaper bytes: $e');
       return null;
     }
   }
 
-  // Generate color palette from image bytes
-  Future<WallpaperColors> _generatePaletteFromBytes(Uint8List bytes) async {
+  Future<void> _saveWallpaperBytesToStorage(String base64String) async {
     try {
-      // Decode image
-      final image = img.decodeImage(bytes);
-      if (image == null) return WallpaperColors.defaultColors();
-
-      // Resize for faster processing
-      final resized = img.copyResize(image, width: 200);
-      
-      // Convert to Flutter image
-      final pngBytes = img.encodePng(resized);
-      final codec = await ui.instantiateImageCodec(pngBytes);
-      final frame = await codec.getNextFrame();
-      final flutterImage = frame.image;
-
-      // Generate palette
-      final generator = await PaletteGenerator.fromImage(
-        flutterImage,
-        maximumColorCount: 16,
-      );
-
-      // Extract colors
-      final primary = generator.dominantColor?.color ?? AppTheme.primaryPurple;
-      final vibrant = generator.vibrantColor?.color ?? AppTheme.accentCyan;
-      final muted = generator.mutedColor?.color ?? AppTheme.accentPink;
-      
-      return WallpaperColors(
-        primary: primary,
-        accent: vibrant,
-        secondary: muted,
-        ghostTint: _generateGhostTint(primary),
-        auraStart: primary,
-        auraEnd: vibrant,
-        particleColor: _generateParticleColor(vibrant, muted),
-      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_wallpaperBytesKey, base64String);
     } catch (e) {
-      debugPrint('⚠️ Palette generation failed: $e');
-      return WallpaperColors.defaultColors();
+      debugPrint('⚠️ Failed to save wallpaper bytes: $e');
     }
   }
 
-  // Generate ghost tint from primary color
-  Color _generateGhostTint(Color primary) {
-    return Color.lerp(Colors.white, primary, 0.15) ?? Colors.white;
-  }
-
-  // Generate particle color
-  Color _generateParticleColor(Color vibrant, Color muted) {
-    return Color.lerp(vibrant, muted, 0.5) ?? vibrant;
-  }
-
-  // Apply colors to app theme
-  Future<void> _applyColors(WallpaperColors colors) async {
-    _currentColors = colors;
-    AppColors.ghostTint = colors.ghostTint;
-    AppColors.auraStart = colors.auraStart;
-    AppColors.auraEnd = colors.auraEnd;
-    AppColors.particleColor = colors.particleColor;
-    
-    await _saveColors(colors);
+  // Public methods for UI
+  Future<void> requestPermission() async {
+    _hasPermission = await _requestPermission();
+    if (_hasPermission) {
+      await _extractWallpaperColors();
+    }
     notifyListeners();
   }
 
-  // Save colors to storage
-  Future<void> _saveColors(WallpaperColors colors) async {
-    await StorageService.saveWallpaperColors({
-      'primary': colors.primary.value,
-      'accent': colors.accent.value,
-      'secondary': colors.secondary.value,
-      'ghostTint': colors.ghostTint.value,
-      'auraStart': colors.auraStart.value,
-      'auraEnd': colors.auraEnd.value,
-      'particleColor': colors.particleColor.value,
-    });
-  }
-
-  // Load saved settings
-  Future<void> _loadSavedSettings() async {
-    final saved = await StorageService.getWallpaperColors();
-    if (saved != null) {
-      _currentColors = WallpaperColors(
-        primary: Color(saved['primary']),
-        accent: Color(saved['accent']),
-        secondary: Color(saved['secondary']),
-        ghostTint: Color(saved['ghostTint']),
-        auraStart: Color(saved['auraStart']),
-        auraEnd: Color(saved['auraEnd']),
-        particleColor: Color(saved['particleColor']),
-      );
-      _applyColors(_currentColors!);
-      debugPrint('✅ Loaded saved wallpaper colors');
+  Future<void> extractAndApply() async {
+    if (!_hasPermission) {
+      debugPrint('⚠️ Cannot extract - requesting permission first');
+      await requestPermission();
+      return;
     }
+    await _extractWallpaperColors();
   }
 
-  // Toggle wallpaper sync
-  void toggleSync(bool enabled) {
-    _isEnabled = enabled;
-    notifyListeners();
-    if (enabled && _permissionGranted) {
-      extractAndApply();
-    } else {
-      _applyColors(WallpaperColors.defaultColors());
-    }
+  Future<void> refresh() async {
+    await extractAndApply();
   }
 
-  // Manual color override
   void setManualColors(WallpaperColors colors) {
-    _isEnabled = false;
-    _applyColors(colors);
+    _currentColors = colors;
+    _saveColors(colors);
+    notifyListeners();
   }
 
-  // Request permission manually (can be called from settings)
-  Future<bool> requestPermission() async {
-    return await _checkAndRequestPermission();
+  void toggle() {
+    _isEnabled = !_isEnabled;
+    notifyListeners();
   }
-}
 
-class WallpaperColors {
-  final Color primary;
-  final Color accent;
-  final Color secondary;
-  final Color ghostTint;
-  final Color auraStart;
-  final Color auraEnd;
-  final Color particleColor;
-
-  WallpaperColors({
-    required this.primary,
-    required this.accent,
-    required this.secondary,
-    required this.ghostTint,
-    required this.auraStart,
-    required this.auraEnd,
-    required this.particleColor,
-  });
-
-  factory WallpaperColors.defaultColors() {
-    return WallpaperColors(
-      primary: AppTheme.primaryPurple,
-      accent: AppTheme.accentCyan,
-      secondary: AppTheme.accentPink,
-      ghostTint: AppTheme.ghostWhite,
-      auraStart: AppTheme.primaryPurple,
-      auraEnd: AppTheme.accentCyan,
-      particleColor: AppTheme.accentPink,
-    );
+  Future<void> requestPermissionManually() async {
+    await requestPermission();
   }
 }

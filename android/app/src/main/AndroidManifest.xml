@@ -4,12 +4,14 @@
     <!-- ============================================ -->
     <!-- WALLPAPER PERMISSIONS (CRITICAL FOR THEME)   -->
     <!-- ============================================ -->
-    <!-- For Android 13+ (API 33+), wallpaper access doesn't need runtime permission -->
-    <!-- For Android 6-12 (API 23-32), needs READ_EXTERNAL_STORAGE -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
-                     android:maxSdkVersion="32" />
+    <!-- For Android 13+ (API 33+) - NEW MEDIA PERMISSIONS -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     
-    <!-- Wallpaper reading (no permission needed on Android 13+) -->
+    <!-- For ALL Android versions - WallpaperManager STILL needs this! -->
+    <!-- Even on Android 13+, WallpaperManager.getWallpaper() checks this permission -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    
+    <!-- Wallpaper reading (works on all versions) -->
     <uses-permission android:name="android.permission.SET_WALLPAPER"
                      tools:ignore="UnusedAttribute" />
     

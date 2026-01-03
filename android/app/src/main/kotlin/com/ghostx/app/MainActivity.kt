@@ -39,12 +39,27 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun hasWallpaperPermission(): Boolean {
-        // Android 13+ (API 33+) doesn't need READ_EXTERNAL_STORAGE for wallpaper
+        // CRITICAL FIX: On Android 13+, WallpaperManager requires BOTH permissions
+        // READ_MEDIA_IMAGES for gallery access
+        // READ_EXTERNAL_STORAGE for wallpaper access (legacy but still needed!)
+        
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            return true
+            val hasMediaImages = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_MEDIA_IMAGES
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            // Also check READ_EXTERNAL_STORAGE as WallpaperManager still needs it
+            val hasStorage = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+            
+            // Need both on Android 13+
+            return hasMediaImages && hasStorage
         }
         
-        // Android 6-12 (API 23-32) needs READ_EXTERNAL_STORAGE
+        // Android 6-12 (API 23-32) needs READ_EXTERNAL_STORAGE only
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             return ContextCompat.checkSelfPermission(
                 this,
@@ -57,26 +72,32 @@ class MainActivity: FlutterActivity() {
     }
 
     private fun requestWallpaperPermission(result: MethodChannel.Result) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ doesn't need permission
+        if (hasWallpaperPermission()) {
             result.success(true)
             return
         }
         
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (hasWallpaperPermission()) {
-                result.success(true)
-            } else {
-                pendingResult = result
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                    PERMISSION_REQUEST_CODE
-                )
-            }
+        // Store the result to respond after permission is granted/denied
+        pendingResult = result
+        
+        // Request appropriate permissions based on Android version
+        val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ needs both READ_MEDIA_IMAGES and READ_EXTERNAL_STORAGE
+            arrayOf(
+                Manifest.permission.READ_MEDIA_IMAGES,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            )
         } else {
-            result.success(true)
+            // Android 6-12 needs only READ_EXTERNAL_STORAGE
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         }
+        
+        // Request permissions - THIS WILL SHOW THE PERMISSION DIALOG
+        ActivityCompat.requestPermissions(
+            this,
+            permissions,
+            PERMISSION_REQUEST_CODE
+        )
     }
 
     private fun getWallpaperWithPermission(result: MethodChannel.Result) {
@@ -85,15 +106,21 @@ class MainActivity: FlutterActivity() {
         } else {
             // Request permission first
             pendingResult = result
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
-                    PERMISSION_REQUEST_CODE
+            
+            val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                arrayOf(
+                    Manifest.permission.READ_MEDIA_IMAGES,
+                    Manifest.permission.READ_EXTERNAL_STORAGE
                 )
             } else {
-                getWallpaperData(result)
+                arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
             }
+            
+            ActivityCompat.requestPermissions(
+                this,
+                permissions,
+                PERMISSION_REQUEST_CODE
+            )
         }
     }
 
@@ -142,15 +169,18 @@ class MainActivity: FlutterActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         
         if (requestCode == PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && 
-                grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission granted - get wallpaper
+            // Check if ALL permissions were granted
+            val allGranted = grantResults.isNotEmpty() && 
+                grantResults.all { it == PackageManager.PERMISSION_GRANTED }
+            
+            if (allGranted) {
+                // All permissions granted - get wallpaper
                 pendingResult?.let { result ->
                     getWallpaperData(result)
                     pendingResult = null
                 }
             } else {
-                // Permission denied
+                // At least one permission denied
                 pendingResult?.error(
                     "PERMISSION_DENIED",
                     "Wallpaper permission denied by user",
