@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- android/app/src/main/res/layout/ghost_overlay.xml -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="80dp"
+    android:layout_height="80dp"
+    android:background="@drawable/ghost_overlay_bg">
+    
+    <!-- Ghost Icon -->
+    <TextView
+        android:id="@+id/ghost_emoji"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:text="👻"
+        android:textSize="40sp"
+        android:gravity="center"
+        android:textColor="#FFFFFF" />
+    
+    <!-- Pulsing Aura Ring -->
+    <View
+        android:id="@+id/aura_ring"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/aura_ring"
+        android:alpha="0.6" />
+        
+</FrameLayout>

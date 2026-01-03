@@ -118,7 +118,7 @@ class _WakeQuestionsScreenState extends State<WakeQuestionsScreen> {
       if (response.statusCode == 200 && mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => const TutorialScreen(),
+            builder: (_) => const InteractiveTutorialScreen(),
           ),
           (route) => false,
         );

@@ -56,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> {
       } else if (!tutorialComplete) {
         // Has auth but no tutorial - show tutorial
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const TutorialScreen()),
+          MaterialPageRoute(builder: (_) => const InteractiveTutorialScreen()),
         );
       } else {
         // All good - go to main app

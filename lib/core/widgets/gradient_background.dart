@@ -22,6 +22,7 @@ class GradientBackground extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // 🔥 CRITICAL: Watch wallpaper service for real-time updates
     final wallpaperService = ref.watch(wallpaperServiceProvider);
     final wallpaperBytes = wallpaperService.wallpaperBytes;
     final colors = wallpaperService.currentColors;
@@ -49,7 +50,7 @@ class GradientBackground extends ConsumerWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Wallpaper image (blurred)
+        // Wallpaper image (blurred) 🖼️
         Image.memory(
           bytes,
           fit: BoxFit.cover,
@@ -58,7 +59,7 @@ class GradientBackground extends ConsumerWidget {
           },
         ),
 
-        // Blur effect
+        // Blur effect 🌫️
         BackdropFilter(
           filter: ImageFilter.blur(
             sigmaX: blur,
@@ -69,7 +70,7 @@ class GradientBackground extends ConsumerWidget {
           ),
         ),
 
-        // Gradient overlay for depth
+        // Gradient overlay for depth (wallpaper-derived) 🎨
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(

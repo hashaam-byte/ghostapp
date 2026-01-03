@@ -40,7 +40,7 @@ class _GuestModeScreenState extends State<GuestModeScreen> {
         // Navigate to tutorial
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(
-            builder: (_) => const TutorialScreen(),
+            builder: (_) => const InteractiveTutorialScreen(),
           ),
           (route) => false,
         );

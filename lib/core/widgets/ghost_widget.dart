@@ -50,6 +50,7 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 CRITICAL: Watch wallpaper service for real-time color updates
     final wallpaperService = ref.watch(wallpaperServiceProvider);
     final colors = wallpaperService.currentColors;
     
@@ -60,6 +61,12 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
       tablet: widget.size * 1.4,
       desktop: widget.size * 1.8,
     );
+
+    // 🎨 Extract wallpaper-derived colors (fallback to defaults if null)
+    final ghostTint = colors?.ghostTint ?? AppColors.ghostTint;
+    final auraStart = colors?.auraStart ?? AppColors.auraStart;
+    final auraEnd = colors?.auraEnd ?? AppColors.auraEnd;
+    final particleColor = colors?.particleColor ?? AppColors.particleColor;
 
     return GestureDetector(
       onTapDown: (_) {
@@ -79,7 +86,7 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Aura ring (wallpaper-adaptive)
+          // Aura ring (wallpaper-adaptive) 🌀
           if (widget.showAura)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
@@ -93,15 +100,14 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    (colors?.auraStart ?? AppColors.auraStart).withOpacity(0.6),
-                    (colors?.auraEnd ?? AppColors.auraEnd).withOpacity(0.3),
+                    auraStart.withOpacity(0.6),
+                    auraEnd.withOpacity(0.3),
                     Colors.transparent,
                   ],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (colors?.auraStart ?? AppColors.auraStart)
-                        .withOpacity(0.5),
+                    color: auraStart.withOpacity(0.5),
                     blurRadius: 40,
                     spreadRadius: 10,
                   ),
@@ -124,7 +130,7 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
                   color: Colors.white24,
                 ),
 
-          // Ghost body
+          // Ghost body (wallpaper-tinted) 👻
           AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: _isPressed 
@@ -137,14 +143,13 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  colors?.ghostTint ?? AppColors.ghostTint,
-                  (colors?.ghostTint ?? AppColors.ghostTint).withOpacity(0.8),
+                  ghostTint,
+                  ghostTint.withOpacity(0.8),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: (colors?.auraStart ?? AppColors.auraStart)
-                      .withOpacity(0.3),
+                  color: auraStart.withOpacity(0.3),
                   blurRadius: 20,
                   spreadRadius: 5,
                 ),
@@ -168,7 +173,7 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
                 curve: Curves.easeInOut,
               ),
 
-          // Particle effects
+          // Particle effects (wallpaper-colored) ✨
           if (widget.showAura)
             ...List.generate(6, (index) {
               return Positioned(
@@ -179,12 +184,10 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
                   height: 4,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: (colors?.particleColor ?? AppColors.particleColor)
-                        .withOpacity(0.6),
+                    color: particleColor.withOpacity(0.6),
                     boxShadow: [
                       BoxShadow(
-                        color: (colors?.particleColor ?? AppColors.particleColor)
-                            .withOpacity(0.8),
+                        color: particleColor.withOpacity(0.8),
                         blurRadius: 4,
                       ),
                     ],

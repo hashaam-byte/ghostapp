@@ -89,7 +89,7 @@ class _SignInScreenState extends State<SignInScreen> {
         if (needsOnboarding) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(
-              builder: (_) => const TutorialScreen(),
+              builder: (_) => const InteractiveTutorialScreen(),
             ),
             (route) => false,
           );
