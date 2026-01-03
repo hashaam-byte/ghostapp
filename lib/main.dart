@@ -9,17 +9,15 @@ import 'core/services/voice_service.dart';
 import 'core/theme/app_theme.dart';
 import 'features/splash/splash_screen.dart';
 
-// 🔥 Global Provider for Wallpaper Service
+// 🔥 Global Providers
 final wallpaperServiceProvider = ChangeNotifierProvider<WallpaperSyncService>((ref) {
   return WallpaperSyncService();
 });
 
-// 🔥 Global Provider for Voice Service
 final voiceServiceProvider = Provider<VoiceService>((ref) {
   return VoiceService();
 });
 
-// 🔥 Global Provider for Notification Service
 final notificationServiceProvider = Provider<NotificationService>((ref) {
   return NotificationService();
 });
@@ -48,28 +46,59 @@ void main() async {
     DeviceOrientation.portraitUp,
   ]);
   
-  // 🗄️ Initialize Hive (local storage)
+  // 🗄️ Step 1: Initialize Hive (no permissions needed)
+  debugPrint('🗄️ Initializing Hive...');
   await Hive.initFlutter();
   await StorageService.init();
+  debugPrint('✅ Hive initialized');
   
-  // 🎨 Initialize Wallpaper Service
+  // 🎨 Step 2: Initialize Wallpaper Service (requests READ_EXTERNAL_STORAGE permission)
+  debugPrint('🎨 Initializing Wallpaper Service...');
   final wallpaperService = WallpaperSyncService();
-  await wallpaperService.initialize();
   
-  // 🔥 CRITICAL: Extract wallpaper colors on startup
   try {
-    await wallpaperService.extractAndApply();
+    await wallpaperService.initialize();
+    if (wallpaperService.hasPermission) {
+      debugPrint('✅ Wallpaper colors loaded from device wallpaper');
+    } else {
+      debugPrint('ℹ️ Using default colors (wallpaper permission not granted)');
+    }
   } catch (e) {
-    debugPrint('Wallpaper extraction failed (using defaults): $e');
+    debugPrint('⚠️ Wallpaper initialization failed: $e');
+    debugPrint('ℹ️ Using default colors');
   }
   
-  // 🔔 Initialize Notification Service
-  final notificationService = NotificationService();
-  await notificationService.initialize();
+  // ⏳ Wait 800ms to ensure wallpaper permission request completes
+  await Future.delayed(const Duration(milliseconds: 800));
   
-  // 🎙️ Initialize Voice Service
+  // 🔔 Step 3: Initialize Notification Service (requests POST_NOTIFICATIONS permission)
+  debugPrint('🔔 Initializing Notification Service...');
+  final notificationService = NotificationService();
+  
+  try {
+    await notificationService.initialize();
+    debugPrint('✅ Notification service initialized');
+  } catch (e) {
+    debugPrint('⚠️ Notification initialization failed: $e');
+    debugPrint('ℹ️ Notifications may not work');
+  }
+  
+  // ⏳ Wait 500ms to ensure notification permission request completes
+  await Future.delayed(const Duration(milliseconds: 500));
+  
+  // 🎙️ Step 4: Initialize Voice Service (requests RECORD_AUDIO permission)
+  debugPrint('🎙️ Initializing Voice Service...');
   final voiceService = VoiceService();
-  await voiceService.initialize();
+  
+  try {
+    await voiceService.initialize();
+    debugPrint('✅ Voice service initialized');
+  } catch (e) {
+    debugPrint('⚠️ Voice initialization failed: $e');
+    debugPrint('ℹ️ Voice features may not work');
+  }
+  
+  debugPrint('🚀 All services initialized - launching app');
   
   runApp(
     ProviderScope(

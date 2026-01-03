@@ -1,3 +1,4 @@
+// lib/features/home/home_screen.dart - FIXED VERSION
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
@@ -44,26 +45,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBottomNav(BuildContext context) {
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
     final baseNavHeight = Responsive.responsive(
       context,
-      mobile: 56.0,  // Reduced from 60
-      tablet: 64.0,   // Reduced from 70
-      desktop: 72.0,  // Reduced from 80
+      mobile: 56.0,
+      tablet: 64.0,
+      desktop: 72.0,
     );
     
     final iconSize = Responsive.responsive(
       context,
-      mobile: 22.0,   // Reduced from 24
-      tablet: 26.0,   // Reduced from 32
-      desktop: 32.0,  // Reduced from 40
+      mobile: 22.0,
+      tablet: 26.0,
+      desktop: 32.0,
     );
     
     final fontSize = Responsive.responsive(
       context,
-      mobile: 10.0,   // Reduced from 11
-      tablet: 11.0,   // Reduced from 13
-      desktop: 13.0,  // Reduced from 15
+      mobile: 10.0,
+      tablet: 11.0,
+      desktop: 13.0,
     );
 
     return Container(
@@ -86,11 +86,11 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.responsive(
                 context,
-                mobile: 16.0,   // Reduced from 24
-                tablet: 32.0,   // Reduced from 48
-                desktop: 48.0,  // Reduced from 64
+                mobile: 16.0,
+                tablet: 32.0,
+                desktop: 48.0,
               ),
-              vertical: 4.0,    // Reduced from 8
+              vertical: 4.0,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -146,8 +146,8 @@ class _NavItemWidget extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 16 : 10,  // Reduced
-          vertical: isTablet ? 6 : 4,      // Reduced
+          horizontal: isTablet ? 14 : 8,  // Reduced further
+          vertical: isTablet ? 4 : 3,     // Reduced to fix overflow
         ),
         decoration: isActive
             ? BoxDecoration(
@@ -166,7 +166,7 @@ class _NavItemWidget extends StatelessWidget {
                   : AppTheme.ghostWhite.withOpacity(0.5),
               size: iconSize,
             ),
-            SizedBox(height: isTablet ? 3 : 2),  // Reduced
+            SizedBox(height: 2), // Fixed spacing
             Text(
               item.label,
               style: TextStyle(
@@ -175,6 +175,7 @@ class _NavItemWidget extends StatelessWidget {
                     : AppTheme.ghostWhite.withOpacity(0.5),
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                height: 1.0, // Fixed line height to prevent overflow
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

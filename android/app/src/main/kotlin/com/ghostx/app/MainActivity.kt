@@ -16,6 +16,7 @@ import java.io.ByteArrayOutputStream
 class MainActivity: FlutterActivity() {
     private val CHANNEL = "ghostx/wallpaper"
     private val PERMISSION_REQUEST_CODE = 1001
+    private var pendingResult: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -26,37 +27,73 @@ class MainActivity: FlutterActivity() {
                     "getWallpaper" -> {
                         getWallpaperWithPermission(result)
                     }
+                    "requestWallpaperPermission" -> {
+                        requestWallpaperPermission(result)
+                    }
+                    "checkWallpaperPermission" -> {
+                        result.success(hasWallpaperPermission())
+                    }
                     else -> result.notImplemented()
                 }
             }
     }
 
-    private fun getWallpaperWithPermission(result: MethodChannel.Result) {
-        // Check if permission is needed (Android 13+)
+    private fun hasWallpaperPermission(): Boolean {
+        // Android 13+ (API 33+) doesn't need READ_EXTERNAL_STORAGE for wallpaper
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13+ doesn't need READ_EXTERNAL_STORAGE for wallpaper
-            getWallpaperData(result)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            // Android 6-12 needs READ_EXTERNAL_STORAGE
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.READ_EXTERNAL_STORAGE
-                ) == PackageManager.PERMISSION_GRANTED
-            ) {
-                getWallpaperData(result)
+            return true
+        }
+        
+        // Android 6-12 (API 23-32) needs READ_EXTERNAL_STORAGE
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            return ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+        
+        // Android 5 and below - permission granted by default
+        return true
+    }
+
+    private fun requestWallpaperPermission(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            // Android 13+ doesn't need permission
+            result.success(true)
+            return
+        }
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (hasWallpaperPermission()) {
+                result.success(true)
             } else {
-                // Request permission
+                pendingResult = result
                 ActivityCompat.requestPermissions(
                     this,
                     arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
                     PERMISSION_REQUEST_CODE
                 )
-                // Return null for now, will retry after permission granted
-                result.success(null)
             }
         } else {
-            // Android 5 and below
+            result.success(true)
+        }
+    }
+
+    private fun getWallpaperWithPermission(result: MethodChannel.Result) {
+        if (hasWallpaperPermission()) {
             getWallpaperData(result)
+        } else {
+            // Request permission first
+            pendingResult = result
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE),
+                    PERMISSION_REQUEST_CODE
+                )
+            } else {
+                getWallpaperData(result)
+            }
         }
     }
 
@@ -107,7 +144,19 @@ class MainActivity: FlutterActivity() {
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.isNotEmpty() && 
                 grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission granted, wallpaper sync will retry automatically
+                // Permission granted - get wallpaper
+                pendingResult?.let { result ->
+                    getWallpaperData(result)
+                    pendingResult = null
+                }
+            } else {
+                // Permission denied
+                pendingResult?.error(
+                    "PERMISSION_DENIED",
+                    "Wallpaper permission denied by user",
+                    null
+                )
+                pendingResult = null
             }
         }
     }

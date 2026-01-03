@@ -31,8 +31,14 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
+    // CRITICAL: Check if widget is still mounted and controllers exist
+    if (!mounted) {
+      debugPrint('❌ Widget disposed, cannot sign in');
+      return;
+    }
+
     // Validate form
-    if (!_formKey.currentState!.validate()) return;
+    if (_formKey.currentState?.validate() != true) return;
 
     // Show loading
     setState(() => _isLoading = true);
@@ -74,10 +80,10 @@ class _SignInScreenState extends State<SignInScreen> {
 
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Text('Welcome back! 👻'),
             backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
 
@@ -125,9 +131,11 @@ class _SignInScreenState extends State<SignInScreen> {
             backgroundColor: AppColors.error,
             duration: const Duration(seconds: 4),
             action: SnackBarAction(
-              label: 'Retry',
+              label: 'Dismiss',
               textColor: Colors.white,
-              onPressed: _signIn,
+              onPressed: () {
+                // Just dismiss
+              },
             ),
           ),
         );

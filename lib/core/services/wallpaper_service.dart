@@ -1,29 +1,70 @@
+// lib/core/services/wallpaper_service.dart - FIXED VERSION
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:image/image.dart' as img;
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import 'storage_service.dart';
 
 class WallpaperService {
   static const MethodChannel _channel = MethodChannel('ghostx/wallpaper');
 
+  // Request wallpaper permission before extraction
+  static Future<bool> _requestPermission() async {
+    try {
+      // Check Android version
+      if (await Permission.storage.isGranted) {
+        return true;
+      }
+
+      // Request permission
+      final status = await Permission.storage.request();
+      
+      if (status.isDenied) {
+        debugPrint('⚠️ Wallpaper permission denied by user');
+        return false;
+      }
+      
+      if (status.isPermanentlyDenied) {
+        debugPrint('⚠️ Wallpaper permission permanently denied - opening settings');
+        await openAppSettings();
+        return false;
+      }
+
+      return status.isGranted;
+    } catch (e) {
+      debugPrint('❌ Permission request error: $e');
+      return false;
+    }
+  }
+
   // Extract wallpaper and generate adaptive colors
   static Future<WallpaperColors> extractWallpaperColors() async {
     try {
+      // Request permission first
+      final hasPermission = await _requestPermission();
+      
+      if (!hasPermission) {
+        debugPrint('ℹ️ Using default colors (no wallpaper permission)');
+        return WallpaperColors.defaultColors();
+      }
+
       // Try to get wallpaper from Android
       final Uint8List? wallpaperBytes = await _getWallpaperBytes();
       
       if (wallpaperBytes != null) {
+        debugPrint('✅ Wallpaper extracted successfully');
         return await _generatePaletteFromBytes(wallpaperBytes);
+      } else {
+        debugPrint('ℹ️ No wallpaper data available');
+        return WallpaperColors.defaultColors();
       }
     } catch (e) {
-      debugPrint('Wallpaper extraction failed: $e');
+      debugPrint('⚠️ Wallpaper extraction failed: $e');
+      return WallpaperColors.defaultColors();
     }
-    
-    // Fallback to default colors
-    return WallpaperColors.defaultColors();
   }
 
   // Get wallpaper bytes from Android
@@ -32,7 +73,11 @@ class WallpaperService {
       final Uint8List? bytes = await _channel.invokeMethod('getWallpaper');
       return bytes;
     } catch (e) {
-      debugPrint('Failed to get wallpaper: $e');
+      if (e.toString().contains('PERMISSION_DENIED')) {
+        debugPrint('⚠️ Wallpaper permission denied - using defaults');
+      } else {
+        debugPrint('❌ Failed to get wallpaper: $e');
+      }
       return null;
     }
   }
@@ -44,7 +89,10 @@ class WallpaperService {
     try {
       // Decode image
       final image = img.decodeImage(bytes);
-      if (image == null) return WallpaperColors.defaultColors();
+      if (image == null) {
+        debugPrint('⚠️ Failed to decode wallpaper image');
+        return WallpaperColors.defaultColors();
+      }
 
       // Convert to Flutter image
       final ui.Image flutterImage = await _convertToFlutterImage(image);
@@ -73,9 +121,10 @@ class WallpaperService {
       // Save to storage
       await _saveColors(colors);
 
+      debugPrint('✅ Wallpaper colors extracted and applied');
       return colors;
     } catch (e) {
-      debugPrint('Palette generation failed: $e');
+      debugPrint('❌ Palette generation failed: $e');
       return WallpaperColors.defaultColors();
     }
   }

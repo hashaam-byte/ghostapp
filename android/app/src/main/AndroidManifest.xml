@@ -1,33 +1,51 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
           xmlns:tools="http://schemas.android.com/tools">
     
-    <!-- Wallpaper access permission -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.SET_WALLPAPER"/>
+    <!-- ============================================ -->
+    <!-- WALLPAPER PERMISSIONS (CRITICAL FOR THEME)   -->
+    <!-- ============================================ -->
+    <!-- For Android 13+ (API 33+), wallpaper access doesn't need runtime permission -->
+    <!-- For Android 6-12 (API 23-32), needs READ_EXTERNAL_STORAGE -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+                     android:maxSdkVersion="32" />
     
-    <!-- Internet for API calls -->
+    <!-- Wallpaper reading (no permission needed on Android 13+) -->
+    <uses-permission android:name="android.permission.SET_WALLPAPER"
+                     tools:ignore="UnusedAttribute" />
+    
+    <!-- ============================================ -->
+    <!-- INTERNET & NETWORK                           -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     
-    <!-- Location for Ghost World (optional) -->
+    <!-- ============================================ -->
+    <!-- LOCATION (OPTIONAL FOR GHOST WORLD)          -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     
-    <!-- Notifications -->
+    <!-- ============================================ -->
+    <!-- NOTIFICATIONS                                -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     
-    <!-- System overlay for Ghost Popup -->
+    <!-- ============================================ -->
+    <!-- SYSTEM OVERLAY & FOREGROUND SERVICE          -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     
-    <!-- Camera for scanner -->
+    <!-- ============================================ -->
+    <!-- CAMERA & MICROPHONE                          -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.CAMERA"/>
-    
-    <!-- Microphone for voice -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     
-    <!-- App usage tracking (for Focus Mode) -->
+    <!-- ============================================ -->
+    <!-- APP USAGE TRACKING (FOR FOCUS MODE)          -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions"/>
     
@@ -35,7 +53,8 @@
         android:label="GhostX"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:enableOnBackInvokedCallback="true">
+        android:enableOnBackInvokedCallback="true"
+        android:requestLegacyExternalStorage="true">
         
         <activity
             android:name=".MainActivity"

@@ -1,12 +1,10 @@
+// lib/core/widgets/ghost_widget.dart - FIXED VERSION
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme/app_theme.dart';
-import '../services/wallpaper_sync_service.dart';
-import '../../main.dart';
 import '../utils/responsive.dart';
 
-class GhostWidget extends ConsumerStatefulWidget {
+class GhostWidget extends StatefulWidget {
   final double size;
   final bool showAura;
   final bool isAnimated;
@@ -25,10 +23,10 @@ class GhostWidget extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<GhostWidget> createState() => _GhostWidgetState();
+  State<GhostWidget> createState() => _GhostWidgetState();
 }
 
-class _GhostWidgetState extends ConsumerState<GhostWidget> 
+class _GhostWidgetState extends State<GhostWidget> 
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
   bool _isPressed = false;
@@ -50,9 +48,11 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 CRITICAL: Watch wallpaper service for real-time color updates
-    final wallpaperService = ref.watch(wallpaperServiceProvider);
-    final colors = wallpaperService.currentColors;
+    // Use AppColors which are updated by WallpaperService
+    final ghostTint = AppColors.ghostTint;
+    final auraStart = AppColors.auraStart;
+    final auraEnd = AppColors.auraEnd;
+    final particleColor = AppColors.particleColor;
     
     // Responsive size
     final responsiveSize = Responsive.responsive(
@@ -61,12 +61,6 @@ class _GhostWidgetState extends ConsumerState<GhostWidget>
       tablet: widget.size * 1.4,
       desktop: widget.size * 1.8,
     );
-
-    // 🎨 Extract wallpaper-derived colors (fallback to defaults if null)
-    final ghostTint = colors?.ghostTint ?? AppColors.ghostTint;
-    final auraStart = colors?.auraStart ?? AppColors.auraStart;
-    final auraEnd = colors?.auraEnd ?? AppColors.auraEnd;
-    final particleColor = colors?.particleColor ?? AppColors.particleColor;
 
     return GestureDetector(
       onTapDown: (_) {

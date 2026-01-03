@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:palette_generator/palette_generator.dart';
 import 'package:image/image.dart' as img;
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import 'storage_service.dart';
 
@@ -18,17 +19,82 @@ class WallpaperSyncService extends ChangeNotifier {
   Uint8List? _wallpaperBytes;
   bool _isEnabled = true;
   bool _isLoading = false;
+  bool _permissionGranted = false;
 
   WallpaperColors? get currentColors => _currentColors;
   Uint8List? get wallpaperBytes => _wallpaperBytes;
   bool get isEnabled => _isEnabled;
   bool get isLoading => _isLoading;
+  bool get hasPermission => _permissionGranted;
 
   // Initialize on app start
   Future<void> initialize() async {
+    debugPrint('🎨 Initializing wallpaper colors...');
+    
+    // Load saved settings first
     await _loadSavedSettings();
-    if (_isEnabled) {
+    
+    // Check and request permission
+    final hasPermission = await _checkAndRequestPermission();
+    
+    if (hasPermission && _isEnabled) {
+      debugPrint('✅ Wallpaper permission granted');
       await extractAndApply();
+    } else {
+      debugPrint('ℹ️ Using default colors (no wallpaper permission)');
+      await _applyColors(WallpaperColors.defaultColors());
+    }
+  }
+
+  // Check and request wallpaper permission
+  Future<bool> _checkAndRequestPermission() async {
+    try {
+      // First check if we're on Android 13+ (no permission needed)
+      final nativeCheck = await _channel.invokeMethod<bool>('checkWallpaperPermission');
+      
+      if (nativeCheck == true) {
+        debugPrint('✅ Wallpaper permission granted (Android 13+ or already granted)');
+        _permissionGranted = true;
+        return true;
+      }
+      
+      // For Android 6-12, we need to request READ_EXTERNAL_STORAGE
+      debugPrint('📋 Requesting storage permission for wallpaper (Android 6-12)...');
+      
+      // Use permission_handler to request
+      final status = await Permission.storage.request();
+      
+      if (status.isGranted) {
+        debugPrint('✅ Storage permission granted via permission_handler');
+        _permissionGranted = true;
+        
+        // Verify with native side
+        final nativeVerify = await _channel.invokeMethod<bool>('checkWallpaperPermission');
+        if (nativeVerify == false) {
+          debugPrint('⚠️ Native verification failed after grant - retrying...');
+          // Give Android a moment to update permission status
+          await Future.delayed(const Duration(milliseconds: 500));
+          final retryCheck = await _channel.invokeMethod<bool>('checkWallpaperPermission');
+          _permissionGranted = retryCheck ?? false;
+          return _permissionGranted;
+        }
+        
+        return true;
+      } else if (status.isPermanentlyDenied) {
+        debugPrint('❌ Storage permission permanently denied');
+        debugPrint('ℹ️ User needs to enable in Settings > Apps > GhostX > Permissions');
+        _permissionGranted = false;
+        return false;
+      } else {
+        debugPrint('! Wallpaper permission denied by user');
+        _permissionGranted = false;
+        return false;
+      }
+      
+    } catch (e) {
+      debugPrint('⚠️ Permission check error: $e');
+      _permissionGranted = false;
+      return false;
     }
   }
 
@@ -40,6 +106,13 @@ class WallpaperSyncService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      // CRITICAL: Only try to get wallpaper if we have permission
+      if (!_permissionGranted) {
+        debugPrint('⚠️ Cannot extract wallpaper - permission not granted');
+        await _applyColors(WallpaperColors.defaultColors());
+        return;
+      }
+      
       // Try to get wallpaper from Android
       final bytes = await _getWallpaperBytes();
       
@@ -47,12 +120,14 @@ class WallpaperSyncService extends ChangeNotifier {
         _wallpaperBytes = bytes;
         final colors = await _generatePaletteFromBytes(bytes);
         await _applyColors(colors);
+        debugPrint('✅ Wallpaper colors extracted and applied');
       } else {
         // Fallback to default
+        debugPrint('ℹ️ Using default colors (no wallpaper data)');
         await _applyColors(WallpaperColors.defaultColors());
       }
     } catch (e) {
-      debugPrint('Wallpaper extraction failed: $e');
+      debugPrint('⚠️ Wallpaper extraction failed: $e');
       await _applyColors(WallpaperColors.defaultColors());
     } finally {
       _isLoading = false;
@@ -66,7 +141,7 @@ class WallpaperSyncService extends ChangeNotifier {
       final Uint8List? bytes = await _channel.invokeMethod('getWallpaper');
       return bytes;
     } catch (e) {
-      debugPrint('Failed to get wallpaper: $e');
+      debugPrint('❌ Failed to get wallpaper: $e');
       return null;
     }
   }
@@ -108,7 +183,7 @@ class WallpaperSyncService extends ChangeNotifier {
         particleColor: _generateParticleColor(vibrant, muted),
       );
     } catch (e) {
-      debugPrint('Palette generation failed: $e');
+      debugPrint('⚠️ Palette generation failed: $e');
       return WallpaperColors.defaultColors();
     }
   }
@@ -162,6 +237,7 @@ class WallpaperSyncService extends ChangeNotifier {
         particleColor: Color(saved['particleColor']),
       );
       _applyColors(_currentColors!);
+      debugPrint('✅ Loaded saved wallpaper colors');
     }
   }
 
@@ -169,7 +245,7 @@ class WallpaperSyncService extends ChangeNotifier {
   void toggleSync(bool enabled) {
     _isEnabled = enabled;
     notifyListeners();
-    if (enabled) {
+    if (enabled && _permissionGranted) {
       extractAndApply();
     } else {
       _applyColors(WallpaperColors.defaultColors());
@@ -180,6 +256,11 @@ class WallpaperSyncService extends ChangeNotifier {
   void setManualColors(WallpaperColors colors) {
     _isEnabled = false;
     _applyColors(colors);
+  }
+
+  // Request permission manually (can be called from settings)
+  Future<bool> requestPermission() async {
+    return await _checkAndRequestPermission();
   }
 }
 
