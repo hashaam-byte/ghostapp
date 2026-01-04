@@ -5,12 +5,18 @@ import 'core/services/storage_service.dart';
 import 'core/services/wallpaper_sync_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/voice_service.dart';
+import 'core/services/background_image_services.dart'; // added import
 import 'core/theme/app_theme.dart';
 import 'features/splash/splash_screen.dart';
 
 // 🔥 Global Providers
 final wallpaperServiceProvider = ChangeNotifierProvider<WallpaperSyncService>((ref) {
   return WallpaperSyncService();
+});
+
+// 🖼️ Background Image Provider (NEW!)
+final backgroundImageServiceProvider = ChangeNotifierProvider<BackgroundImageService>((ref) {
+  return BackgroundImageService();
 });
 
 final voiceServiceProvider = Provider<VoiceService>((ref) {
@@ -95,6 +101,17 @@ void main() async {
     debugPrint('⚠️ Voice initialization failed: $e');
   }
   
+  // 🖼️ Step 5: Initialize Background Image Service (NEW!)
+  debugPrint('🖼️ Initializing Background Image Service...');
+  final bgImageService = BackgroundImageService();
+  
+  try {
+    await bgImageService.initialize();
+    debugPrint('✅ Background image service initialized');
+  } catch (e) {
+    debugPrint('⚠️ Background image initialization failed: $e');
+  }
+  
   debugPrint('🚀 All services initialized - launching app');
   
   runApp(
@@ -103,6 +120,7 @@ void main() async {
         wallpaperServiceProvider.overrideWith((ref) => wallpaperService),
         notificationServiceProvider.overrideWith((ref) => notificationService),
         voiceServiceProvider.overrideWith((ref) => voiceService),
+        backgroundImageServiceProvider.overrideWith((ref) => bgImageService), // NEW!
       ],
       child: const GhostXApp(),
     ),

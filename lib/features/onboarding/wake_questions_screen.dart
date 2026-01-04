@@ -7,7 +7,7 @@ import '../../core/services/api_client.dart';
 import '../../core/config/api_config.dart';
 import '../../core/theme/app_theme.dart';
 import '../tutorial/tutorial_screen.dart';
-
+import 'background_selection_screen.dart';
 class WakeQuestionsScreen extends StatefulWidget {
   const WakeQuestionsScreen({super.key});
 
@@ -115,14 +115,14 @@ class _WakeQuestionsScreenState extends State<WakeQuestionsScreen> {
         },
       );
 
-      if (response.statusCode == 200 && mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(
-            builder: (_) => const InteractiveTutorialScreen(),
-          ),
-          (route) => false,
-        );
-      }
+     if (response.statusCode == 200 && mounted) {
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(
+      builder: (_) => const BackgroundSelectionScreen(), // CHANGED!
+    ),
+    (route) => false,
+  );
+}
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

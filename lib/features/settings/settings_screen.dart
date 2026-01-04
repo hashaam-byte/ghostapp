@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 import '../../core/widgets/gradient_background.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/wallpaper_sync_service.dart';
+import '../../core/services/background_image_services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../models/user_model.dart';
 import '../../main.dart';
@@ -398,6 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     final ghostProfile = _user?.ghostProfile;
     final wallpaperService = ref.watch(wallpaperServiceProvider);
+    final bgService = ref.watch(backgroundImageServiceProvider); // watch provider
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -758,8 +761,39 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
               const SizedBox(height: 24),
 
-              // Account section
-              const _SectionHeader(title: 'Account'),
+              // 🖼️ CUSTOM BACKGROUND SECTION (NEW!)
+              const _SectionHeader(title: 'Custom Background'),
+              
+              _SettingsTile(
+                icon: Icons.wallpaper,
+                title: 'Background Image',
+                subtitle: bgService.hasBackground ? 'Tap to change' : 'Not set - using default',
+                trailing: bgService.hasBackground
+                    ? Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.success),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Image.file(
+                            bgService.backgroundImage!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      )
+                    : null,
+                onTap: () async {
+                  await _showBackgroundOptions();
+                },
+              ),
+
+              const SizedBox(height: 24),
+
+               // Account section
+               const _SectionHeader(title: 'Account'),
               _SettingsTile(
                 icon: Icons.person,
                 title: 'Edit Profile',
@@ -912,6 +946,69 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
 
               const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show options to select or remove custom background
+  Future<void> _showBackgroundOptions() async {
+    final bgService = ref.read(backgroundImageServiceProvider);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1A1A),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: Icon(Icons.photo_library, color: AppColors.auraStart),
+                title: const Text('Choose from Gallery', style: TextStyle(color: AppTheme.ghostWhite)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final success = await bgService.pickFromGallery();
+                  if (success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('✅ Background updated!'), backgroundColor: AppColors.success),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.camera_alt, color: AppColors.auraStart),
+                title: const Text('Take a Photo', style: TextStyle(color: AppTheme.ghostWhite)),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final success = await bgService.pickFromCamera();
+                  if (success && mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('✅ Background updated!'), backgroundColor: AppColors.success),
+                    );
+                  }
+                },
+              ),
+              if (bgService.hasBackground)
+                ListTile(
+                  leading: Icon(Icons.delete, color: AppColors.error),
+                  title: const Text('Remove Background', style: TextStyle(color: AppTheme.ghostWhite)),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await bgService.removeBackground();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('🗑️ Background removed'), backgroundColor: AppColors.warning),
+                      );
+                    }
+                  },
+                ),
             ],
           ),
         ),

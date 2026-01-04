@@ -28,7 +28,10 @@ dependencies:
   shimmer: ^3.0.0
   flutter_staggered_animations: ^1.1.1
   lottie: ^2.7.0
-  
+
+  # ... existing dependencies ...
+  image_picker: ^1.0.7
+  path_provider: ^2.1.2
   # Wallpaper & Colors
   palette_generator: ^0.3.3+3
   wallpaper_manager_flutter: ^1.0.0
