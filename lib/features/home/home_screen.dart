@@ -1,12 +1,13 @@
-// lib/features/home/home_screen.dart - FIXED VERSION
+// lib/features/home/home_screen.dart - GX REBRANDED
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
-import '../ghost_space/ghost_space_screen.dart';
-import '../chat/chat_screen.dart';
+import '../ghost_space/gx_space_screen.dart';
+import '../chat/gx_talk_screen.dart';
 import '../tasks/tasks_screen.dart';
-import '../settings/settings_screen.dart';
-import 'package:flutter/services.dart';
+import '../network/gx_network_screen.dart';
+import '../studio/gx_studio_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,17 +20,19 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = [
-    const GhostSpaceScreen(),
-    const ChatScreen(),
-    const TasksScreen(),
-    const SettingsScreen(),
+    const GXCoreScreen(), // Main GX presence (renamed from GhostSpaceScreen)
+    const GXTalkScreen(), // Chat (renamed from ChatScreen)
+    const TasksScreen(), // Tasks & Quests
+    const GXNetworkScreen(), // Community (new)
+    const GXStudioScreen(), // 3D Room (new)
   ];
 
   final List<_NavItem> _navItems = [
-    _NavItem(icon: Icons.auto_awesome, label: 'Ghost'),
-    _NavItem(icon: Icons.chat_bubble_outline, label: 'Chat'),
-    _NavItem(icon: Icons.task_alt, label: 'Tasks'),
-    _NavItem(icon: Icons.settings_outlined, label: 'Settings'),
+    _NavItem(icon: Icons.auto_awesome, label: 'GX', emoji: '⚡'),
+    _NavItem(icon: Icons.chat_bubble_outline, label: 'Talk', emoji: '💬'),
+    _NavItem(icon: Icons.task_alt, label: 'Tasks', emoji: '✓'),
+    _NavItem(icon: Icons.people_outline, label: 'Network', emoji: '🌐'),
+    _NavItem(icon: Icons.view_in_ar, label: 'Studio', emoji: '🏠'),
   ];
 
   @override
@@ -47,23 +50,23 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildBottomNav(BuildContext context) {
     final baseNavHeight = Responsive.responsive(
       context,
-      mobile: 56.0,
-      tablet: 64.0,
-      desktop: 72.0,
+      mobile: 70.0,
+      tablet: 80.0,
+      desktop: 90.0,
     );
     
     final iconSize = Responsive.responsive(
       context,
-      mobile: 22.0,
-      tablet: 26.0,
-      desktop: 32.0,
+      mobile: 24.0,
+      tablet: 28.0,
+      desktop: 34.0,
     );
     
     final fontSize = Responsive.responsive(
       context,
-      mobile: 10.0,
-      tablet: 11.0,
-      desktop: 13.0,
+      mobile: 11.0,
+      tablet: 12.0,
+      desktop: 14.0,
     );
 
     return Container(
@@ -77,6 +80,12 @@ class _HomeScreenState extends State<HomeScreen> {
             Colors.black,
           ],
         ),
+        border: Border(
+          top: BorderSide(
+            color: AppColors.auraStart.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
       ),
       child: SafeArea(
         top: false,
@@ -86,14 +95,14 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: EdgeInsets.symmetric(
               horizontal: Responsive.responsive(
                 context,
-                mobile: 16.0,
-                tablet: 32.0,
-                desktop: 48.0,
+                mobile: 8.0,
+                tablet: 16.0,
+                desktop: 24.0,
               ),
               vertical: 4.0,
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(
                 _navItems.length,
                 (index) => _NavItemWidget(
@@ -118,8 +127,9 @@ class _HomeScreenState extends State<HomeScreen> {
 class _NavItem {
   final IconData icon;
   final String label;
+  final String emoji;
 
-  _NavItem({required this.icon, required this.label});
+  _NavItem({required this.icon, required this.label, required this.emoji});
 }
 
 class _NavItemWidget extends StatelessWidget {
@@ -146,27 +156,38 @@ class _NavItemWidget extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: Container(
         padding: EdgeInsets.symmetric(
-          horizontal: isTablet ? 14 : 8,  // Reduced further
-          vertical: isTablet ? 4 : 3,     // Reduced to fix overflow
+          horizontal: isTablet ? 12 : 6,
+          vertical: isTablet ? 6 : 4,
         ),
         decoration: isActive
             ? BoxDecoration(
                 gradient: AppColors.ghostAuraGradient,
                 borderRadius: BorderRadius.circular(AppRadius.full),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.auraStart.withOpacity(0.3),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ],
               )
             : null,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              item.icon,
-              color: isActive 
-                  ? Colors.white 
-                  : AppTheme.ghostWhite.withOpacity(0.5),
-              size: iconSize,
-            ),
-            SizedBox(height: 2), // Fixed spacing
+            // Use emoji for active, icon for inactive (more modern)
+            isActive
+                ? Text(
+                    item.emoji,
+                    style: TextStyle(fontSize: iconSize),
+                  )
+                : Icon(
+                    item.icon,
+                    color: AppTheme.ghostWhite.withOpacity(0.5),
+                    size: iconSize,
+                  ),
+            SizedBox(height: isTablet ? 4 : 2),
             Text(
               item.label,
               style: TextStyle(
@@ -175,7 +196,7 @@ class _NavItemWidget extends StatelessWidget {
                     : AppTheme.ghostWhite.withOpacity(0.5),
                 fontSize: fontSize,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                height: 1.0, // Fixed line height to prevent overflow
+                height: 1.0,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

@@ -1,11 +1,11 @@
+// lib/features/gx_core/gx_pulse_actions.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/theme/app_theme.dart';
-import '../study/study_mode_screen.dart';
+import '../study/gx_focus_mode_screen.dart';
 
-
-class QuickActionsSheet extends StatelessWidget {
-  const QuickActionsSheet({super.key});
+class GXPulseActions extends StatelessWidget {
+  const GXPulseActions({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -39,13 +39,33 @@ class QuickActionsSheet extends StatelessWidget {
               ),
             ),
 
-            // Title
+            // Title with glow
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Row(
                 children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.ghostAuraGradient,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.auraStart.withOpacity(0.5),
+                          blurRadius: 12,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.bolt,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Text(
-                    'Quick Actions',
+                    'GX Pulse',
                     style: Theme.of(context).textTheme.displayMedium?.copyWith(
                           fontSize: 24,
                         ),
@@ -67,19 +87,21 @@ class QuickActionsSheet extends StatelessWidget {
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
+                  // Row 1: Focus & Study
                   Row(
                     children: [
                       Expanded(
-                        child: _ActionButton(
+                        child: _PulseActionCard(
                           icon: Icons.psychology,
-                          label: 'Focus Mode',
+                          label: 'Focus',
                           subtitle: '25 min',
                           color: AppColors.auraStart,
+                          gradient: true,
                           onTap: () {
                             Navigator.pop(context);
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const FocusModeScreen(
+                                builder: (_) => const GXFocusModeScreen(
                                   durationMinutes: 25,
                                   mode: 'focus',
                                 ),
@@ -90,16 +112,16 @@ class QuickActionsSheet extends StatelessWidget {
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _ActionButton(
+                        child: _PulseActionCard(
                           icon: Icons.school,
-                          label: 'Study Mode',
+                          label: 'Study',
                           subtitle: '50 min',
                           color: AppColors.success,
                           onTap: () {
                             Navigator.pop(context);
                             Navigator.of(context).push(
                               MaterialPageRoute(
-                                builder: (_) => const FocusModeScreen(
+                                builder: (_) => const GXFocusModeScreen(
                                   durationMinutes: 50,
                                   mode: 'study',
                                 ),
@@ -110,63 +132,67 @@ class QuickActionsSheet extends StatelessWidget {
                       ),
                     ],
                   ),
+                  
                   const SizedBox(height: 12),
+
+                  // Row 2: Lock & Sleep
                   Row(
                     children: [
                       Expanded(
-                        child: _ActionButton(
+                        child: _PulseActionCard(
                           icon: Icons.block,
                           label: 'Lock Apps',
                           subtitle: '1 hour',
                           color: AppColors.error,
                           onTap: () {
                             Navigator.pop(context);
-                            // TODO: Navigate to app locker
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('App locker coming soon!'),
-                              ),
-                            );
+                            _showComingSoon(context, 'App Locker');
                           },
                         ).animate().fadeIn(duration: 400.ms, delay: 200.ms).slideX(begin: -0.2),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: _ActionButton(
+                        child: _PulseActionCard(
                           icon: Icons.nightlight,
-                          label: 'Sleep Mode',
+                          label: 'Sleep',
                           subtitle: 'Until 7 AM',
                           color: AppColors.warning,
                           onTap: () {
                             Navigator.pop(context);
-                            // TODO: Activate sleep mode
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Sleep mode activated 😴'),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
+                            _activateSleepMode(context);
                           },
                         ).animate().fadeIn(duration: 400.ms, delay: 300.ms).slideX(begin: -0.2),
                       ),
                     ],
                   ),
+
                   const SizedBox(height: 12),
-                  _LongActionButton(
+
+                  // Long action: Phone boost
+                  _PulseLongAction(
                     icon: Icons.cleaning_services,
                     label: 'Boost Phone',
                     subtitle: 'Clear cache & optimize',
                     color: AppColors.auraEnd,
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Phone optimizer
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Phone optimization coming soon!'),
-                        ),
-                      );
+                      _showComingSoon(context, 'Phone Optimizer');
                     },
                   ).animate().fadeIn(duration: 400.ms, delay: 400.ms).slideY(begin: 0.2),
+
+                  const SizedBox(height: 12),
+
+                  // Long action: Scan
+                  _PulseLongAction(
+                    icon: Icons.qr_code_scanner,
+                    label: 'Scan',
+                    subtitle: 'QR, Crypto, DM Safety',
+                    color: AppColors.auraStart,
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showComingSoon(context, 'Scanner');
+                    },
+                  ).animate().fadeIn(duration: 400.ms, delay: 500.ms).slideY(begin: 0.2),
                 ],
               ),
             ),
@@ -177,20 +203,42 @@ class QuickActionsSheet extends StatelessWidget {
       ),
     );
   }
+
+  static void _showComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature coming soon! ⚡'),
+        backgroundColor: AppColors.auraStart,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  static void _activateSleepMode(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('💤 Sleep mode activated until 7 AM'),
+        backgroundColor: AppColors.success,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 }
 
-class _ActionButton extends StatelessWidget {
+class _PulseActionCard extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
   final Color color;
+  final bool gradient;
   final VoidCallback onTap;
 
-  const _ActionButton({
+  const _PulseActionCard({
     required this.icon,
     required this.label,
     required this.subtitle,
     required this.color,
+    this.gradient = false,
     required this.onTap,
   });
 
@@ -201,18 +249,29 @@ class _ActionButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          gradient: gradient ? AppColors.ghostAuraGradient : null,
+          color: gradient ? null : color.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: color.withOpacity(0.3),
+            color: gradient ? Colors.transparent : color.withOpacity(0.3),
           ),
+          boxShadow: gradient
+              ? [
+                  BoxShadow(
+                    color: AppColors.auraStart.withOpacity(0.3),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           children: [
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                color: gradient ? Colors.white.withOpacity(0.2) : Colors.transparent,
+                gradient: gradient ? null : LinearGradient(
                   colors: [color, color.withOpacity(0.7)],
                 ),
                 borderRadius: BorderRadius.circular(12),
@@ -244,14 +303,14 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _LongActionButton extends StatelessWidget {
+class _PulseLongAction extends StatelessWidget {
   final IconData icon;
   final String label;
   final String subtitle;
   final Color color;
   final VoidCallback onTap;
 
-  const _LongActionButton({
+  const _PulseLongAction({
     required this.icon,
     required this.label,
     required this.subtitle,

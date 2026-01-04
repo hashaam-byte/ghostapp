@@ -1,33 +1,34 @@
+// lib/features/study/gx_focus_mode_screen.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/widgets/gradient_background.dart';
-import '../../core/widgets/ghost_widget.dart';
+import '../../core/widgets/gx_aura_widget.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/services/api_client.dart';
-import '../../core/config/api_config.dart';
 
-class FocusModeScreen extends StatefulWidget {
+class GXFocusModeScreen extends StatefulWidget {
   final int durationMinutes;
   final String mode; // 'focus', 'study', 'deep_work'
   
-  const FocusModeScreen({
+  const GXFocusModeScreen({
     super.key,
     this.durationMinutes = 25,
     this.mode = 'focus',
   });
 
   @override
-  State<FocusModeScreen> createState() => _FocusModeScreenState();
+  State<GXFocusModeScreen> createState() => _GXFocusModeScreenState();
 }
 
-class _FocusModeScreenState extends State<FocusModeScreen> 
+class _GXFocusModeScreenState extends State<GXFocusModeScreen> 
     with TickerProviderStateMixin {
   late int _remainingSeconds;
   Timer? _timer;
   bool _isPaused = false;
   bool _isActive = false;
   late AnimationController _pulseController;
+  late AnimationController _rotateController;
 
   @override
   void initState() {
@@ -38,12 +39,18 @@ class _FocusModeScreenState extends State<FocusModeScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat(reverse: true);
+
+    _rotateController = AnimationController(
+      duration: const Duration(seconds: 30),
+      vsync: this,
+    )..repeat();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
     _pulseController.dispose();
+    _rotateController.dispose();
     super.dispose();
   }
 
@@ -88,51 +95,75 @@ class _FocusModeScreenState extends State<FocusModeScreen>
 
     if (!mounted) return;
 
-    // Show completion dialog
+    // Show completion celebration
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1A1A),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('🎉', style: TextStyle(fontSize: 64)),
-            const SizedBox(height: 16),
-            const Text(
-              'Focus Complete!',
-              style: TextStyle(
-                color: AppTheme.ghostWhite,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(32),
+          decoration: BoxDecoration(
+            gradient: AppColors.ghostAuraGradient,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.auraStart.withOpacity(0.5),
+                blurRadius: 30,
+                spreadRadius: 10,
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '+${widget.durationMinutes} XP earned',
-              style: TextStyle(
-                color: AppColors.success,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop(); // Close dialog
-                Navigator.of(context).pop(); // Close focus screen
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.auraStart,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('🎉', style: TextStyle(fontSize: 80))
+                  .animate()
+                  .scale(duration: 600.ms, curve: Curves.elasticOut),
+              const SizedBox(height: 16),
+              const Text(
+                'Focus Complete!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
                 ),
-              ),
-              child: const Text('Done'),
-            ),
-          ],
+              ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
+              const SizedBox(height: 8),
+              Text(
+                '+${widget.durationMinutes} XP earned',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                ),
+              ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pop(); // Close focus screen
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.auraStart,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Awesome!',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ).animate().fadeIn(duration: 400.ms, delay: 600.ms).scale(delay: 600.ms),
+            ],
+          ),
         ),
       ),
     );
@@ -142,6 +173,28 @@ class _FocusModeScreenState extends State<FocusModeScreen>
     final minutes = seconds ~/ 60;
     final secs = seconds % 60;
     return '${minutes.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}';
+  }
+
+  String _getModeLabel() {
+    switch (widget.mode) {
+      case 'study':
+        return 'STUDY MODE';
+      case 'deep_work':
+        return 'DEEP WORK';
+      default:
+        return 'FOCUS MODE';
+    }
+  }
+
+  String _getModeEmoji() {
+    switch (widget.mode) {
+      case 'study':
+        return '📚';
+      case 'deep_work':
+        return '🎯';
+      default:
+        return '⚡';
+    }
   }
 
   @override
@@ -166,7 +219,7 @@ class _FocusModeScreenState extends State<FocusModeScreen>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Stay'),
+                  child: const Text('Stay Focused'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(true),
@@ -208,17 +261,30 @@ class _FocusModeScreenState extends State<FocusModeScreen>
                           vertical: 8,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          gradient: AppColors.ghostAuraGradient,
                           borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.auraStart.withOpacity(0.3),
+                              blurRadius: 8,
+                              spreadRadius: 2,
+                            ),
+                          ],
                         ),
-                        child: Text(
-                          widget.mode.toUpperCase(),
-                          style: const TextStyle(
-                            color: AppTheme.ghostWhite,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1,
-                          ),
+                        child: Row(
+                          children: [
+                            Text(_getModeEmoji(), style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Text(
+                              _getModeLabel(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -227,15 +293,15 @@ class _FocusModeScreenState extends State<FocusModeScreen>
 
                 const Spacer(),
 
-                // Ghost with pulsing aura
+                // Aura with pulsing effect
                 AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
                     return Transform.scale(
                       scale: 1.0 + (_pulseController.value * 0.05),
-                      child: const GhostWidget(
+                      child: const GXAuraWidget(
                         size: 100,
-                        showAura: true,
+                        showParticles: true,
                         isAnimated: false,
                         mood: 'focused',
                       ),
@@ -253,6 +319,7 @@ class _FocusModeScreenState extends State<FocusModeScreen>
                     fontSize: 72,
                     fontWeight: FontWeight.w200,
                     fontFeatures: [FontFeature.tabularFigures()],
+                    letterSpacing: 4,
                   ),
                 )
                     .animate(onPlay: (controller) => controller.repeat())
@@ -263,19 +330,42 @@ class _FocusModeScreenState extends State<FocusModeScreen>
 
                 const SizedBox(height: 16),
 
-                // Progress text
+                // Status text
                 if (_isActive)
-                  Text(
-                    _isPaused ? 'Paused' : 'Stay focused...',
-                    style: TextStyle(
-                      color: AppTheme.ghostWhite.withOpacity(0.6),
-                      fontSize: 18,
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 8,
                     ),
-                  ),
+                    decoration: BoxDecoration(
+                      color: _isPaused 
+                          ? AppColors.warning.withOpacity(0.2)
+                          : AppColors.success.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: _isPaused 
+                            ? AppColors.warning.withOpacity(0.5)
+                            : AppColors.success.withOpacity(0.5),
+                      ),
+                    ),
+                    child: Text(
+                      _isPaused ? '⏸ Paused' : '🎯 Stay focused...',
+                      style: TextStyle(
+                        color: _isPaused ? AppColors.warning : AppColors.success,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                      .animate(
+                        key: ValueKey(_isPaused),
+                      )
+                      .fadeIn(duration: 300.ms)
+                      .scale(),
 
                 const SizedBox(height: 40),
 
-                // Progress ring
+                // Progress circle
                 SizedBox(
                   width: 200,
                   height: 200,
@@ -295,7 +385,7 @@ class _FocusModeScreenState extends State<FocusModeScreen>
                           ),
                         ),
                       ),
-                      // Progress circle
+                      // Progress circle with rotation
                       Center(
                         child: SizedBox(
                           width: 180,
@@ -307,6 +397,17 @@ class _FocusModeScreenState extends State<FocusModeScreen>
                             valueColor: AlwaysStoppedAnimation(
                               AppColors.auraStart,
                             ),
+                          ),
+                        ),
+                      ),
+                      // Center completion percentage
+                      Center(
+                        child: Text(
+                          '${(progress * 100).toInt()}%',
+                          style: TextStyle(
+                            color: AppTheme.ghostWhite.withOpacity(0.6),
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
@@ -326,20 +427,44 @@ class _FocusModeScreenState extends State<FocusModeScreen>
                         ElevatedButton(
                           onPressed: _startFocus,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.auraStart,
+                            backgroundColor: Colors.transparent,
                             minimumSize: const Size(double.infinity, 56),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
+                            padding: EdgeInsets.zero,
                           ),
-                          child: const Text(
-                            'Start Focus',
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                          child: Ink(
+                            decoration: BoxDecoration(
+                              gradient: AppColors.ghostAuraGradient,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.auraStart.withOpacity(0.5),
+                                  blurRadius: 12,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Container(
+                              alignment: Alignment.center,
+                              constraints: const BoxConstraints(
+                                minHeight: 56,
+                              ),
+                              child: const Text(
+                                'Start Focus',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
                             ),
                           ),
                         )
+                            .animate()
+                            .fadeIn(duration: 600.ms)
+                            .scale(delay: 200.ms)
                       else
                         // Active controls
                         Row(
@@ -381,13 +506,34 @@ class _FocusModeScreenState extends State<FocusModeScreen>
 
                       // Tip
                       if (_isActive)
-                        Text(
-                          'Apps are blocked during focus time',
-                          style: TextStyle(
-                            color: AppTheme.ghostWhite.withOpacity(0.4),
-                            fontSize: 12,
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                            ),
                           ),
-                          textAlign: TextAlign.center,
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                color: AppColors.auraStart,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Distracting apps are blocked',
+                                  style: TextStyle(
+                                    color: AppTheme.ghostWhite.withOpacity(0.6),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                     ],
                   ),

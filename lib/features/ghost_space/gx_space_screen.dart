@@ -1,8 +1,9 @@
+// lib/features/gx_core/gx_core_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/widgets/gradient_background.dart';
-import '../../core/widgets/ghost_widget.dart';
+import '../../core/widgets/gx_aura_widget.dart';
 import '../../core/widgets/gesture_detector_wrapper.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/api_client.dart';
@@ -11,27 +12,47 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/responsive.dart';
 import '../../models/user_model.dart';
 import '../quests/quests_screen.dart';
-import '../chat/chat_screen.dart';
-import 'quick_actions_sheet.dart';
+import '../chat/gx_talk_screen.dart';
+import '../ghost_space/quick_actions_sheet.dart';
 
-class GhostSpaceScreen extends ConsumerStatefulWidget {
-  const GhostSpaceScreen({super.key});
+class GXCoreScreen extends ConsumerStatefulWidget {
+  const GXCoreScreen({super.key});
 
   @override
-  ConsumerState<GhostSpaceScreen> createState() => _GhostSpaceScreenState();
+  ConsumerState<GXCoreScreen> createState() => _GXCoreScreenState();
 }
 
-class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
+class _GXCoreScreenState extends ConsumerState<GXCoreScreen> {
   User? _user;
   bool _isLoading = true;
   Map<String, dynamic>? _stats;
-  bool _isLoadingStats = false;
+  String _auraMessage = 'Tap me to talk';
+  DateTime _lastInteraction = DateTime.now();
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadStats();
+    _startAuraUpdates();
+  }
+
+  void _startAuraUpdates() {
+    // Update aura message based on time
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        final messages = [
+          'What\'s on your mind?',
+          'Ready to focus?',
+          'Let\'s grow together',
+          'I\'m here when you need me',
+        ];
+        setState(() {
+          _auraMessage = messages[DateTime.now().second % messages.length];
+        });
+        _startAuraUpdates();
+      }
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -54,22 +75,16 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
   }
 
   Future<void> _loadStats() async {
-    if (_isLoadingStats) return;
-    
-    setState(() => _isLoadingStats = true);
-
     try {
       final response = await ApiClient.get(ApiConfig.dashboardStats);
       
       if (response.statusCode == 200) {
         setState(() {
           _stats = response.data['stats'];
-          _isLoadingStats = false;
         });
       }
     } catch (e) {
       debugPrint('Failed to load stats: $e');
-      setState(() => _isLoadingStats = false);
     }
   }
 
@@ -78,6 +93,114 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
       _loadUserData(),
       _loadStats(),
     ]);
+  }
+
+  void _handleAuraTap() {
+    GhostHaptics.medium();
+    
+    // Show quick dialog
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.7),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.auraStart.withOpacity(0.95),
+                AppColors.auraEnd.withOpacity(0.95),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.auraStart.withOpacity(0.5),
+                blurRadius: 30,
+                spreadRadius: 10,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '⚡',
+                style: TextStyle(fontSize: 64),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Hey there!',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'What do you want to do?',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.chat_bubble,
+                      label: 'Talk',
+                      onTap: () {
+                        Navigator.pop(context);
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const GXTalkScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _QuickActionButton(
+                      icon: Icons.psychology,
+                      label: 'Focus',
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showPulseActions();
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ).animate().scale(
+        duration: 300.ms,
+        curve: Curves.easeOutBack,
+      ),
+    );
+  }
+
+  void _handleAuraHold() {
+    GhostHaptics.heavy();
+    _showPulseActions();
+  }
+
+  void _showPulseActions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => const GXPulseActions(),
+    );
   }
 
   @override
@@ -93,19 +216,17 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
       );
     }
 
-    final ghostProfile = _user?.ghostProfile;
-    final level = ghostProfile?.level ?? 1;
-    final totalXP = ghostProfile?.totalXP ?? 0;
-    final xpToNext = ghostProfile?.xpToNextLevel ?? 100;
-    final coins = ghostProfile?.coins ?? 0;
+    final gxProfile = _user?.ghostProfile;
+    final level = gxProfile?.level ?? 1;
+    final totalXP = gxProfile?.totalXP ?? 0;
+    final xpToNext = gxProfile?.xpToNextLevel ?? 100;
+    final coins = gxProfile?.coins ?? 0;
     
-    // Calculate XP progress
     final currentLevelXP = (level - 1) * 100;
     final xpProgress = totalXP - currentLevelXP;
     final xpNeeded = xpToNext;
     final progressPercent = (xpProgress / xpNeeded).clamp(0.0, 1.0);
 
-    // Stats from server
     final todayXP = _stats?['today']?['xp'] ?? 0;
     final streakDays = _stats?['streaks']?['productivity'] ?? 0;
     final pendingTasks = _stats?['tasks']?['pending'] ?? 0;
@@ -118,28 +239,22 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
             onRefresh: _refresh,
             color: AppColors.auraStart,
             child: GhostGestureZone(
-              onGhostTap: () {
-                _showGhostDialog(context);
-                GhostHaptics.medium();
-              },
-              onGhostHold: () {
-                _showQuickActionsSheet(context);
-                GhostHaptics.heavy();
-              },
+              onGhostTap: _handleAuraTap,
+              onGhostHold: _handleAuraHold,
               onNavigateChat: () {
                 Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const ChatScreen()),
+                  MaterialPageRoute(builder: (_) => const GXTalkScreen()),
                 );
                 GhostHaptics.light();
               },
               onShowActions: () {
-                _showQuickActionsSheet(context);
+                _showPulseActions();
                 GhostHaptics.light();
               },
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  // Top bar with level and coins
+                  // Top bar
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: Responsive.padding(context),
@@ -147,133 +262,73 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Level badge
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: context.responsiveValue(
-                                mobile: 16,
-                                tablet: 20,
-                              ),
-                              vertical: context.responsiveValue(
-                                mobile: 8,
-                                tablet: 12,
-                              ),
-                            ),
-                            decoration: BoxDecoration(
-                              gradient: AppColors.ghostAuraGradient,
-                              borderRadius: BorderRadius.circular(AppRadius.full),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.auraStart.withOpacity(0.3),
-                                  blurRadius: 8,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome,
-                                  size: context.responsiveValue(
-                                    mobile: 16,
-                                    tablet: 20,
-                                  ),
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Lv $level',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: context.responsiveValue(
-                                      mobile: 14,
-                                      tablet: 16,
-                                    ),
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          _TopBadge(
+                            icon: Icons.auto_awesome,
+                            label: 'L$level',
+                            gradient: true,
                           ).animate().fadeIn(duration: 600.ms).scale(),
 
                           // Coins
-                          Container(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: context.responsiveValue(
-                                mobile: 16,
-                                tablet: 20,
-                              ),
-                              vertical: context.responsiveValue(
-                                mobile: 8,
-                                tablet: 12,
-                              ),
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(AppRadius.full),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  '💎',
-                                  style: TextStyle(
-                                    fontSize: context.responsiveValue(
-                                      mobile: 16,
-                                      tablet: 20,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  coins.toString(),
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: context.responsiveValue(
-                                      mobile: 14,
-                                      tablet: 16,
-                                    ),
-                                    color: AppTheme.ghostWhite,
-                                  ),
-                                ),
-                              ],
-                            ),
+                          _TopBadge(
+                            icon: null,
+                            emoji: '💎',
+                            label: coins.toString(),
                           ).animate().fadeIn(duration: 600.ms, delay: 100.ms).scale(),
                         ],
                       ),
                     ),
                   ),
 
-                  // Ghost center piece
+                  // Main content
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: Column(
                       children: [
                         const Spacer(),
 
-                        // Ghost with tap instruction
+                        // GX Aura
                         Column(
                           children: [
-                            GhostWidget(
+                            GXAuraWidget(
                               size: Responsive.ghostSize(context),
-                              showAura: true,
+                              showParticles: true,
                               isAnimated: true,
-                              mood: ghostProfile?.currentMood ?? 'happy',
-                              onTap: () {
-                                _showGhostDialog(context);
-                              },
-                              onLongPress: () {
-                                _showQuickActionsSheet(context);
-                              },
+                              mood: gxProfile?.currentMood ?? 'happy',
+                              level: level,
+                              onTap: _handleAuraTap,
+                              onLongPress: _handleAuraHold,
                             ).animate().fadeIn(duration: 800.ms).scale(delay: 200.ms),
 
-                            SizedBox(
-                              height: context.responsiveValue(
-                                mobile: 24,
-                                tablet: 32,
+                            SizedBox(height: context.responsiveValue(mobile: 24, tablet: 32)),
+
+                            // Aura message
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
                               ),
-                            ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: AppColors.auraStart.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                _auraMessage,
+                                style: const TextStyle(
+                                  color: AppTheme.ghostWhite,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                                .animate(
+                                  key: ValueKey(_auraMessage),
+                                )
+                                .fadeIn(duration: 400.ms)
+                                .slideY(begin: 0.2, end: 0),
+
+                            const SizedBox(height: 24),
 
                             // XP Progress
                             Column(
@@ -313,7 +368,7 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
                               ],
                             ),
 
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 24),
 
                             // Gesture hints
                             Row(
@@ -350,7 +405,6 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
                                   label: 'Streak',
                                   value: streakDays.toString(),
                                   color: AppColors.error,
-                                  isLoading: _isLoadingStats,
                                 ).animate().fadeIn(duration: 400.ms, delay: 600.ms).slideY(begin: 0.2),
                               ),
                               const SizedBox(width: 12),
@@ -360,7 +414,6 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
                                   label: 'Today',
                                   value: '$todayXP XP',
                                   color: AppColors.success,
-                                  isLoading: _isLoadingStats,
                                 ).animate().fadeIn(duration: 400.ms, delay: 700.ms).slideY(begin: 0.2),
                               ),
                               const SizedBox(width: 12),
@@ -378,7 +431,6 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
                                     label: 'Tasks',
                                     value: pendingTasks.toString(),
                                     color: AppColors.auraStart,
-                                    isLoading: _isLoadingStats,
                                   ),
                                 ).animate().fadeIn(duration: 400.ms, delay: 800.ms).slideY(begin: 0.2),
                               ),
@@ -403,89 +455,75 @@ class _GhostSpaceScreenState extends ConsumerState<GhostSpaceScreen> {
       ),
     );
   }
+}
 
-  void _showGhostDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.auraStart,
-                AppColors.auraEnd,
-              ],
-            ),
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.auraStart.withOpacity(0.5),
-                blurRadius: 20,
-                spreadRadius: 5,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                '👻',
-                style: TextStyle(fontSize: 64),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Hey! What\'s up?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ChatScreen()),
-                        );
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppColors.auraStart,
-                      ),
-                      child: const Text('Let\'s chat'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-            ],
-          ),
+// Helper widgets
+class _TopBadge extends StatelessWidget {
+  final IconData? icon;
+  final String? emoji;
+  final String label;
+  final bool gradient;
+
+  const _TopBadge({
+    this.icon,
+    this.emoji,
+    required this.label,
+    this.gradient = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: context.responsiveValue(mobile: 16, tablet: 20),
+        vertical: context.responsiveValue(mobile: 8, tablet: 12),
+      ),
+      decoration: BoxDecoration(
+        gradient: gradient ? AppColors.ghostAuraGradient : null,
+        color: gradient ? null : Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppRadius.full),
+        border: Border.all(
+          color: gradient 
+              ? Colors.transparent 
+              : Colors.white.withOpacity(0.2),
         ),
-      ).animate().scale(duration: 300.ms, curve: Curves.easeOutBack),
-    );
-  }
-
-  void _showQuickActionsSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => const GXPulseActions(),
+        boxShadow: gradient
+            ? [
+                BoxShadow(
+                  color: AppColors.auraStart.withOpacity(0.3),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null)
+            Icon(
+              icon,
+              size: context.responsiveValue(mobile: 16, tablet: 20),
+              color: Colors.white,
+            ),
+          if (emoji != null)
+            Text(
+              emoji!,
+              style: TextStyle(
+                fontSize: context.responsiveValue(mobile: 16, tablet: 20),
+              ),
+            ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: context.responsiveValue(mobile: 14, tablet: 16),
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -494,10 +532,7 @@ class _GestureHint extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _GestureHint({
-    required this.icon,
-    required this.label,
-  });
+  const _GestureHint({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -526,24 +561,19 @@ class _StatCard extends StatelessWidget {
   final String label;
   final String value;
   final Color color;
-  final bool isLoading;
 
   const _StatCard({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
-    this.isLoading = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.all(
-        context.responsiveValue(
-          mobile: 16,
-          tablet: 20,
-        ),
+        context.responsiveValue(mobile: 16, tablet: 20),
       ),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.05),
@@ -556,24 +586,14 @@ class _StatCard extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 24),
           const SizedBox(height: 8),
-          if (isLoading)
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation(color),
-              ),
-            )
-          else
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
+          ),
           const SizedBox(height: 4),
           Text(
             label,
@@ -583,6 +603,46 @@ class _StatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 28),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/services/storage_service.dart';
 import '../../core/services/api_client.dart';
 import '../../core/config/api_config.dart';
-import 'welcome_screen.dart';
+import 'gx_awakening_screen.dart';
 import '../home/home_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -66,6 +66,6 @@ class _AuthGateState extends State<AuthGate> {
       return const HomeScreen();
     }
 
-    return const WelcomeScreen();
+    return const GXAwakeningScreen();
   }
 }
